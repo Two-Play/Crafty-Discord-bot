@@ -93,12 +93,13 @@ async def auto_stop():
         else:
             print('failed to get server list')
 
-        await asyncio.sleep(3600)  # task runs every hour
+        await asyncio.sleep(1800)  # task runs every hour
 
 
 @bot.event
 async def on_ready():
     print('Bot is ready. {}'.format(bot.user))
+    print("Crafty Bot version 0.1")
 
     await auto_stop()
     # response = requests.post(SERVER_URL + '/api/v2/auth/login', json={'username': USERNAME, 'password': PASSWORD}, verify=False)
@@ -110,8 +111,7 @@ async def on_ready():
 
 """
 @bot.tree.command(name="rps")/*
-@app_commands.guilds(discord.Object(id=1190285247288447026))
-@app_commands.choices(choices=[
+@app_commands.guilds(discord.Object(id=1168172802562601121))@app_commands.choices(choices=[
     app_commands.Choice(name="Rock", value="rock"),
     app_commands.Choice(name="Paper", value="paper"),
     app_commands.Choice(name="Scissors", value="scissors"),
@@ -127,17 +127,16 @@ async def rps(i: discord.Interaction, choices: app_commands.Choice[str]):
 
 
 @bot.hybrid_command(name='sync', description='Sync commands')
-@app_commands.guilds(discord.Object(id=1190285247288447026))
+@app_commands.guilds(discord.Object(id=1168172802562601121))
 @is_owner()
 async def sync(ctx) -> None:
-    synced = await bot.tree.sync(guild=discord.Object(id=1190285247288447026))
+    synced = await bot.tree.sync(guild=discord.Object(id=1168172802562601121))
     # add commands to the appcommands
     await ctx.reply("{} commands synced".format(len(synced)))
 
 
 # @bot.hybrid_command(name='ping', description='Pong!')
-# @app_commands.guilds(discord.Object(id=1190285247288447026))
-# async def ping(ctx, nummer: int):
+# @app_commands.guilds(discord.Object(id=1168172802562601121))# async def ping(ctx, nummer: int):
 #     print('ping')
 #     await ctx.send('Pong! ' + str(nummer))
 
@@ -157,8 +156,7 @@ async def get_token(ctx):
 
 
 @bot.hybrid_command(name='login', description='get login status')
-@app_commands.guilds(discord.Object(id=1190285247288447026))
-# login to the server
+@app_commands.guilds(discord.Object(id=1168172802562601121))# login to the server
 async def login(ctx):
     print('login')
     if os.environ['CRAFTY_TOKEN'] == '':
@@ -168,8 +166,7 @@ async def login(ctx):
 
 
 @bot.hybrid_command(name='list', description='get server list')
-@app_commands.guilds(discord.Object(id=1190285247288447026))
-# get the list of servers
+@app_commands.guilds(discord.Object(id=1168172802562601121))# get the list of servers
 async def list(ctx):
     print('servers')
     if os.environ['CRAFTY_TOKEN'] == '':
@@ -199,7 +196,7 @@ async def list(ctx):
 
 # get statistics of a server
 @bot.hybrid_command(name='stats', description='get server stats')
-@app_commands.guilds(discord.Object(id=1190285247288447026))
+@app_commands.guilds(discord.Object(id=1168172802562601121))
 async def stats(ctx, server_id):
     print('stats')
     if os.environ['CRAFTY_TOKEN'] == '':
@@ -236,7 +233,7 @@ async def stats(ctx, server_id):
 
 # start a server
 @bot.hybrid_command(name='start', description='start a server')
-@app_commands.guilds(discord.Object(id=1190285247288447026))
+@app_commands.guilds(discord.Object(id=1168172802562601121))
 async def start(ctx, server_id):
     print('start')
     if os.environ['CRAFTY_TOKEN'] == '':
@@ -265,7 +262,7 @@ async def start(ctx, server_id):
 
 # stop a server
 @bot.hybrid_command(name='stop', description='stop a server')
-@app_commands.guilds(discord.Object(id=1190285247288447026))
+@app_commands.guilds(discord.Object(id=1168172802562601121))
 async def stop(ctx, server_id):
     print('stop')
     if os.environ['CRAFTY_TOKEN'] == '':
@@ -308,7 +305,7 @@ async def stop(ctx, server_id):
 # @bot.command()
 # @bot.tree.command(name='bot_help', description='Show help')
 @bot.hybrid_command(name='bot_help', description='Show help')
-@app_commands.guilds(discord.Object(id=1190285247288447026))
+@app_commands.guilds(discord.Object(id=1168172802562601121))
 async def bot_help(interaction: discord.Interaction):
     print('help')
 
