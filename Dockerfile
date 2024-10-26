@@ -8,11 +8,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-ENV USERNAME=""
-ENV PASSWORD=""
-ENV SERVER_URL=""
-ENV DISCORD_TOKEN=""
-ENV CRAFTY_TOKEN=""
+ENV USERNAME=;
+ENV PASSWORD=;
+ENV SERVER_URL=;
+ENV DISCORD_TOKEN=;
+ENV CRAFTY_TOKEN=;
 ENV PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
 CMD [ "python", "./main.py" ]
