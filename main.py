@@ -8,7 +8,14 @@ from discord.ext import commands
 from discord import Interaction, app_commands
 from discord.ext.commands import is_owner
 from discord import ui
+from dotenv import load_dotenv
 
+# Load environment variables from .env file
+load_dotenv()
+
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix='>', intents=intents)
 
 def check():
     # check if all environment variables are set
