@@ -5,7 +5,6 @@ This module contains helper different functions.
 import os
 import sys
 
-
 def check_env_vars():
     """
     Check if all required environment variables are set and exit if any are missing.
