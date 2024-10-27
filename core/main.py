@@ -1,16 +1,20 @@
+"""
+This is the main file of the bot. It contains the main loop and the event handlers.
+"""
+
 import asyncio
 import os
-import requests
 import discord
 from discord.ext import commands
-from discord import Interaction, app_commands
+from discord import app_commands
 from discord.ext.commands import is_owner
-from discord import ui
 from dotenv import load_dotenv
 
-from helper import check_env_vars
-from network import is_response_successful, get_json_response
-from printing import print_server_info, print_server_status
+from core.constants import AUTO_STOP_SLEEP, GUILD_ID, API_ENDPOINT
+from core.helper import check_env_vars
+from core.network import get_json_response
+from core.printing import print_server_info, print_server_status
+from core.server import is_server_running, stop_server, get_player_count
 
 # Load environment variables from .env file
 load_dotenv()
@@ -20,43 +24,16 @@ SERVER_URL = os.environ['SERVER_URL']
 if 'USERNAME' in os.environ and 'PASSWORD' in os.environ:
     USERNAME = os.environ['USERNAME']
     PASSWORD = os.environ['PASSWORD']
-API_ENDPOINT = '/api/v2/servers/'
-GUILD_ID = 1168172802562601121
-AUTO_STOP_SLEEP = 1800  # 30 minutes
-
 
 intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='>', intents=intents)
 
-def stop_server(server_id) -> bool:
-    data = get_json_response(API_ENDPOINT + str(server_id) + '/action/stop_server', 'failed to stop server')
-    if data['status'] == "ok":
-        print('Server stopped', str(server_id))
-        return True
-    else:
-        print('failed to stop server')
-        return False
-
-def get_player_count(server_id, ctx=None) -> int:
-    data = get_json_response(API_ENDPOINT + str(server_id) + '/stats', 'failed to get server stats')
-    if not data:
-        if ctx:
-            ctx.reply('failed to get server stats')
-        return -1
-    return data['data']['online']
-
-def is_server_running(server_id, ctx=None) -> bool:
-    data = get_json_response(API_ENDPOINT + str(server_id) + '/stats', 'failed to get server stats')
-    if not data:
-        if ctx:
-            ctx.reply('failed to get server stats')
-        return False
-    return data['data']['running']
-
-
 # stop server after 1 hour of inactivity (no players online)
 async def auto_stop():
+    """
+    Automatically stop servers that have been inactive for a certain period of time.
+    """
     while True:
         # get list of servers ids and loop through them and add only the ones that are running
         data = get_json_response('/api/v2/servers', 'failed to get server list')
@@ -81,21 +58,21 @@ async def on_ready():
     # get_token()
 
 
-"""
-@bot.tree.command(name="rps")/*
-@app_commands.guilds(discord.Object(id=GUILD_ID))@app_commands.choices(choices=[
-    app_commands.Choice(name="Rock", value="rock"),
-    app_commands.Choice(name="Paper", value="paper"),
-    app_commands.Choice(name="Scissors", value="scissors"),
-    ])
-async def rps(i: discord.Interaction, choices: app_commands.Choice[str]):
-    if (choices.value == 'rock'):
-        counter = 'paper'
-    elif (choices.value == 'paper'):
-        counter = 'scissors'
-    else:
-        counter = 'rock'
-"""
+
+# @bot.tree.command(name="rps")/*
+# @app_commands.guilds(discord.Object(id=GUILD_ID))@app_commands.choices(choices=[
+#     app_commands.Choice(name="Rock", value="rock"),
+#     app_commands.Choice(name="Paper", value="paper"),
+#     app_commands.Choice(name="Scissors", value="scissors"),
+#     ])
+# async def rps(i: discord.Interaction, choices: app_commands.Choice[str]):
+#     if (choices.value == 'rock'):
+#         counter = 'paper'
+#     elif (choices.value == 'paper'):
+#         counter = 'scissors'
+#     else:
+#         counter = 'rock'
+
 
 
 @bot.hybrid_command(name='sync', description='Sync commands')
@@ -112,32 +89,24 @@ async def sync(ctx) -> None:
 @is_owner()
 async def get_token(ctx):
     print('get_token')
-    response = requests.post(SERVER_URL + '/api/v2/auth/login', json={'username': USERNAME, 'password': PASSWORD},
-                             verify=False)
-    if is_response_successful(response):
-        os.environ['CRAFTY_TOKEN'] = response.json()['data']['token']
-        await ctx.send('Toke successful retrieved')
-        return True
-    else:
-        print('Login failed', response.status_code)
-        return False
+
+    data = get_json_response('/api/v2/auth/login', 'failed to get token')
+    if not data:
+        await ctx.reply('failed to get token')
+        return
+
+    os.environ['CRAFTY_TOKEN'] = data['data']['token']
+    await ctx.send('Toke successful retrieved')
 
 @bot.hybrid_command(name='list', description='get server list')
 @app_commands.guilds(discord.Object(id=GUILD_ID))# get the list of servers
 async def get_list(ctx):
     print('servers')
+    data = get_json_response('/api/v2/servers', 'failed to get server list')
+    server_info_text = print_server_info(data)
 
-    response = requests.get(SERVER_URL + '/api/v2/servers',
-                            headers={'Authorization': 'Bearer ' + os.environ['CRAFTY_TOKEN']}, verify=False)
-    if is_response_successful(response):
-        # print(json.dumps(response.json(), indent=4))
+    await ctx.reply(f"Serverinformationen:\n{server_info_text}")
 
-        data = response.json()
-        server_info_text = print_server_info(data)
-
-        await ctx.reply(f"Serverinformationen:\n{server_info_text}")
-    else:
-        await ctx.reply('failed to get server list')
 
 
 # get statistics of a server
@@ -169,7 +138,8 @@ async def start(ctx, server_id):
         await ctx.reply('Server already running')
         return
 
-    data = get_json_response(API_ENDPOINT + str(server_id) + '/action/start_server', 'failed to start server')
+    data = get_json_response(API_ENDPOINT + str(server_id) + '/action/start_server',
+                             'failed to start server')
     if not data:
         await ctx.reply('failed to start server')
         return
@@ -192,7 +162,7 @@ async def stop(ctx, server_id):
     # check if player is online
     player_count = get_player_count(server_id, ctx)
     if player_count != 0:
-        await ctx.reply('cannot stop server: {} Player(s) online'.format(player_count))
+        await ctx.reply(f'cannot stop server: {player_count} Player(s) online')
         return
 
     if stop_server(server_id):
@@ -224,6 +194,9 @@ async def bot_help(interaction: discord.Interaction):
 # command not found
 @bot.event
 async def on_command_error(ctx, error):
+    """
+    Handle command not found errors
+    """
     if isinstance(error, commands.CommandNotFound):
         await ctx.send('Command not found. Use `>bot_help` to get a list of available commands.')
 

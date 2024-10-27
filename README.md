@@ -1,8 +1,27 @@
 # Crafty Controller Discord bot
+
 ![GitHub License](https://img.shields.io/github/license/Two-Play/Crafty-Discord-bot)
 ![GitHub top language](https://img.shields.io/github/languages/top/Two-Play/Crafty-Discord-bot)
 ![GitHub contributors](https://img.shields.io/github/contributors/Two-Play/Crafty-Discord-bot)
 ![GitHub Release Date](https://img.shields.io/github/release-date/Two-Play/Crafty-Discord-bot)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/d5b3f979005e4c52916f7fb741068483)](https://app.codacy.com/gh/Two-Play/Crafty-Discord-bot/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/d5b3f979005e4c52916f7fb741068483)](https://app.codacy.com/gh/Two-Play/Crafty-Discord-bot/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
+
+## Table of Contents
+
+1. [Introduction](#introduction)
+2. [Features](#features)
+3. [Roadmap](#roadmap)
+4. [Installation](#installation)
+    - [Requirements](#requirements)
+    - [Docker](#docker)
+    - [Python](#python)
+5. [Usage](#usage)
+6. [Issues](#issues)
+7. [Contributing](#contributing)
+8. [Support the Project](#support-the-project)
+9. [Donations](#donations)
+10. [License](#license)
 
 ## Introduction
 
@@ -10,19 +29,18 @@ This is a Discord bot that is designed to control the Crafty-Controller-4 server
 The bot is written in Python and uses the Discord.py library to interact with the 
 Discord API.
 
-## Table of Contents
+### Features
 
-1. [Introduction](#introduction)
-2. [Installation](#installation)
-    - [Requirements](#requirements)
-    - [Docker](#docker)
-    - [Python](#python)
-3. [Usage](#usage)
-4. [Issues](#issues)
-5. [Contributing](#contributing)
-6. [Support the Project](#support-the-project)
-7. [Donations](#donations)
-8. [License](#license)
+-   **Server Status**: Get the status of the server
+-   **Server Start**: Start the server
+-   **Server Stop**: Stop the server
+
+## Roadmap
+
+-   **Server Restart**: Restart the server
+-   **Server Backup**: Create a backup of the server
+-   **Web UI**: Create a web interface for the bot
+
 
 
 ## Installation
@@ -56,6 +74,7 @@ server and obtain the user token. You can do this by following these steps:
 9. Save your user token in a safe place (you will need it later)
 
 #### Discord Bot
+
 You will need to create a new Discord bot and obtain a bot token. You can do this by following these steps:
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
@@ -88,6 +107,7 @@ You will need to create a new Discord bot and obtain a bot token. You can do thi
 Congratulations! Your bot has been invited to your server
 
 ### Docker
+
 Installing the bot using Docker is the easiest way to get started. To do this, you will need to have Docker installed on your system. If you do not have Docker installed, you can download it from the [official Docker website](https://www.docker.com/get-started).
 
 
@@ -117,6 +137,7 @@ services:
 ```
 
 ### Python
+
 If you would like to install the bot using Python, you will need to have Python 3.8 or higher installed on your system.
 
 Clone the repository
@@ -168,6 +189,7 @@ python main.py
 Replace `YOUR_DISCORD_TOKEN` with your Discord bot token and `YOUR_MONGO_URI` with your MongoDB connection string.
 
 ## Usage
+
 ### Slash Commands (Beta)
 The bot supports slash commands. To use the slash commands, you will need to have the `Use slash commands` permission enabled for the bot.
 ```bash
@@ -175,6 +197,7 @@ The bot supports slash commands. To use the slash commands, you will need to hav
 ```
 
 ### Command (>)
+
 Enter the following command to get a list of available commands:
 ```bash
   >help or >bot_help
@@ -204,6 +227,7 @@ Thank you for your contribution!
 If you have any questions, please feel free to reach out to us
 
 ## Support the Project
+
 If you would like to support the project, you can do so by:
 
 - Giving the project a star on GitHub
@@ -212,6 +236,7 @@ If you would like to support the project, you can do so by:
 - Donating to the project
 
 ## Donations
+
 If you would like to donate to the project, you can do so using the following methods:
 
 | Platform                                                                                                                             | Link                                                                    | QR Code                                                                                                                                                                                           |
@@ -232,4 +257,5 @@ You can click on the QR code to show a larger version of the QR code. GitHub doe
 | ![Monero Badge](https://img.shields.io/badge/Monero-F60?logo=monero&logoColor=fff&style=for-the-badge)          | XMR          | ![Monero QR Code](https://api.qrserver.com/v1/create-qr-code/?color=000000&bgcolor=FFFFFF&data=41hZYQV5uDzfiLCusRAxARST3hfTzGv7RNRyB92G1RZw64pvEQqwDo94zZHVxfvcmncLU1ockvJxbZBQToPqqDtBAor97sU&qzone=1&margin=0&size=150x150&ecc=L) | `41hZYQV5uDzfiLCusRAxARST3hfTzGv7RNRyB92G1RZw64pvEQqwDo94zZHVxfvcmncLU1ockvJxbZBQToPqqDtBAor97sU` |
 
 ## License
+
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
