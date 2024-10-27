@@ -4,3 +4,5 @@
 .env
 
 env.sh
+
+__pycache__/
