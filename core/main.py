@@ -9,7 +9,7 @@ from discord import ui
 from dotenv import load_dotenv
 
 from helper import check_env_vars
-from network import is_response_successful, get_response, get_json_response
+from network import is_response_successful, get_json_response
 from printing import print_server_info, print_server_status
 
 # Load environment variables from .env file
@@ -103,7 +103,7 @@ async def rps(i: discord.Interaction, choices: app_commands.Choice[str]):
 @is_owner()
 async def sync(ctx) -> None:
     synced = await bot.tree.sync(guild=discord.Object(id=GUILD_ID))
-    # add commands to the appcommands
+    # add commands to the app commands
     await ctx.reply("{} commands synced".format(len(synced)))
 
 
