@@ -1,5 +1,6 @@
 """
-This is the main file of the bot. It contains the main loop and the event handlers.
+This is the main file of the bot. It contains the
+main loop and the event handlers.
 """
 
 import asyncio
@@ -29,6 +30,7 @@ intents = discord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix='>', intents=intents)
 
+
 # stop server after 1 hour of inactivity (no players online)
 async def auto_stop():
     """
@@ -36,7 +38,8 @@ async def auto_stop():
     """
     while True:
         # get list of servers ids and loop through them and add only the ones that are running
-        data = get_json_response('/api/v2/servers', 'failed to get server list')
+        data = get_json_response('/api/v2/servers',
+                                 'failed to get server list')
         if not data:
             print('failed to get server list')
             return
@@ -58,7 +61,6 @@ async def on_ready():
     # get_token()
 
 
-
 # @bot.tree.command(name="rps")/*
 # @app_commands.guilds(discord.Object(id=GUILD_ID))@app_commands.choices(choices=[
 #     app_commands.Choice(name="Rock", value="rock"),
@@ -72,7 +74,6 @@ async def on_ready():
 #         counter = 'scissors'
 #     else:
 #         counter = 'rock'
-
 
 
 @bot.hybrid_command(name='sync', description='Sync commands')
@@ -98,15 +99,15 @@ async def get_token(ctx):
     os.environ['CRAFTY_TOKEN'] = data['data']['token']
     await ctx.send('Toke successful retrieved')
 
+
 @bot.hybrid_command(name='list', description='get server list')
-@app_commands.guilds(discord.Object(id=GUILD_ID))# get the list of servers
+@app_commands.guilds(discord.Object(id=GUILD_ID))  # get the list of servers
 async def get_list(ctx):
     print('servers')
     data = get_json_response('/api/v2/servers', 'failed to get server list')
     server_info_text = print_server_info(data)
 
     await ctx.reply(f"Serverinformationen:\n{server_info_text}")
-
 
 
 # get statistics of a server

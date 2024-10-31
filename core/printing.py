@@ -2,6 +2,7 @@
 This module contains functions to print the server information as text.
 """
 
+
 def print_server_info(data) -> str:
     """
     Print the server information as text.
@@ -18,6 +19,7 @@ def print_server_info(data) -> str:
         server_info_text += f"```\nID: {server_id}\nServer: {name}\n  IP: {ip}\n  Port: {port}\n```\n"
     return server_info_text
 
+
 def print_server_status(data) -> str:
     """
     Print the server status as text.
@@ -32,9 +34,9 @@ def print_server_status(data) -> str:
     server_info_text: str
     if running:
         server_info_text = (
-           f"```\nWorld: {data['world_name']}\nRunning: {running}\nPlayers: {
-           data['players']}\nVersion: {data['version']}\nCPU: {cpu_usage}%\nRAM: {
-           mem}MB ({mem_percent}%)\n```\n")
+            f"```\nWorld: {data['world_name']}\nRunning: {running}\nPlayers: {data['players']}\n"
+            f"Version: {data['version']}\nCPU: {cpu_usage}%\nRAM: {mem}MB ({mem_percent}%)\n```\n"
+            )
     else:
         server_info_text = f"```\nWorld: {data['world_name']}\nRunning: {running}\n```\n"
     return server_info_text

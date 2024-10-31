@@ -22,6 +22,7 @@ def is_response_successful(response: requests.Response) -> bool:
     """
     return response.status_code == STATUS_SUCCESS
 
+
 def get_response(path: str, verify: bool = False, timeout: int = 6) -> Response:
     """
     Send a GET request to the specified path and return the response.
@@ -41,6 +42,7 @@ def get_response(path: str, verify: bool = False, timeout: int = 6) -> Response:
         timeout=timeout
     )
     return response
+
 
 def get_json_response(path: str, error_message: str = "Error while response") -> json:
     """
