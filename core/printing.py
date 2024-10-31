@@ -15,8 +15,7 @@ def print_server_info(data) -> str:
     # Format the server information as text
     server_info_text = ""
     for server_id, name, ip, port in server_info:
-        server_info_text += f"```\nID: {server_id}\nServer: {name}\n  IP: {
-        ip}\n  Port: {port}\n```\n"
+        server_info_text += f"```\nID: {server_id}\nServer: {name}\n  IP: {ip}\n  Port: {port}\n```\n"
     return server_info_text
 
 def print_server_status(data) -> str:
