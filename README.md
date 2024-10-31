@@ -31,15 +31,15 @@ Discord API.
 
 ### Features
 
--   **Server Status**: Get the status of the server
--   **Server Start**: Start the server
--   **Server Stop**: Stop the server
+- **Server Status**: Get the status of the server
+- **Server Start**: Start the server
+- **Server Stop**: Stop the server
 
 ## Roadmap
 
--   **Server Restart**: Restart the server
--   **Server Backup**: Create a backup of the server
--   **Web UI**: Create a web interface for the bot
+- **Server Restart**: Restart the server
+- **Server Backup**: Create a backup of the server
+- **Web UI**: Create a web interface for the bot
 
 
 
@@ -50,6 +50,7 @@ To install the bot, you will need to have a few things set up first.
 ### Requirements
 
 #### Server
+
 You should have a Server to deploy this bot. You can use a VPS, local server or a Raspberry Pi. 
 You can also use your own computer, but it is not recommended for availability reasons.
 
@@ -191,6 +192,7 @@ Replace `YOUR_DISCORD_TOKEN` with your Discord bot token and `YOUR_MONGO_URI` wi
 ## Usage
 
 ### Slash Commands (Beta)
+
 The bot supports slash commands. To use the slash commands, you will need to have the `Use slash commands` permission enabled for the bot.
 ```bash
   /help or /bot_help

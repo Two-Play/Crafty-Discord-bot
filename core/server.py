@@ -1,5 +1,4 @@
 """This module contains the Server class."""
-import dataclasses
 
 from core.constants import API_ENDPOINT
 from core.network import get_json_response
