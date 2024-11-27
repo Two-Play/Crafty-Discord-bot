@@ -5,6 +5,8 @@ This module contains helper different functions.
 import os
 import sys
 
+from discord.app_commands import commands
+
 
 def check_env_vars():
     """
@@ -42,3 +44,19 @@ def check_env_vars():
         if not os.environ.get(var):
             print(f'{var} not set')
             sys.exit()
+
+def check_server_id(server_id: str, ctx) -> bool:
+    """
+    Check if the server ID is valid.
+
+    Args:
+        server_id (str): The server ID to check.
+        ctx (commands.Context): The context of the command.
+
+    Returns:
+        bool: True if the server ID is valid, False otherwise.
+    """
+    if not server_id.isdigit():
+        ctx.reply('invalid server id format, must be a UUID')
+        return False
+    return True
