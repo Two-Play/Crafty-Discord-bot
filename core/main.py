@@ -5,17 +5,22 @@ main loop and the event handlers.
 
 import asyncio
 import os
+import sys
+
 import discord
 from discord.ext import commands
 from discord import app_commands
 from discord.ext.commands import is_owner
 from dotenv import load_dotenv
 
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from core.constants import AUTO_STOP_SLEEP, GUILD_ID, API_ENDPOINT
-from core.helper import check_env_vars
+from core.helper import check_env_vars, check_server_id
 from core.network import get_json_response
 from core.printing import print_server_info, print_server_status
 from core.server import is_server_running, stop_server, get_player_count
+from core.custom_help_command import CustomHelpCommand
 
 # Load environment variables from .env file
 load_dotenv()
@@ -28,7 +33,7 @@ if 'USERNAME' in os.environ and 'PASSWORD' in os.environ:
 
 intents = discord.Intents.default()
 intents.message_content = True
-bot = commands.Bot(command_prefix='>', intents=intents)
+bot = commands.Bot(command_prefix='>', intents=intents, help_command=CustomHelpCommand())
 
 
 # stop server after 1 hour of inactivity (no players online)
@@ -57,9 +62,18 @@ async def on_ready():
     print('Bot is ready. {}'.format(bot.user))
     print("Crafty Bot version 0.1")
 
-    await auto_stop()
+    try:
+        if 'ENABLE' in os.environ and os.environ['ENABLE'] == 'true':
+            print('auto stop enabled')
+            #bot.loop.create_task(auto_stop())
+            await auto_stop()
+        else:
+            print('auto stop disabled')
+    except Exception as e:
+        print(e)
     # get_token()
 
+from discord.ext import commands
 
 # @bot.tree.command(name="rps")/*
 # @app_commands.guilds(discord.Object(id=GUILD_ID))@app_commands.choices(choices=[
@@ -76,7 +90,7 @@ async def on_ready():
 #         counter = 'rock'
 
 
-@bot.hybrid_command(name='sync', description='Sync commands')
+@bot.hybrid_command(name='sync', description='Sync slash commands')
 @app_commands.guilds(discord.Object(id=GUILD_ID))
 @is_owner()
 async def sync(ctx) -> None:
@@ -113,10 +127,13 @@ async def get_list(ctx):
 # get statistics of a server
 @bot.hybrid_command(name='stats', description='get server stats')
 @app_commands.guilds(discord.Object(id=GUILD_ID))
-async def stats(ctx, server_id):
+async def stats(ctx, server_id: str = commands.parameter(default=None, description="Server ID", )):
     print('stats')
-    if not server_id:
-        await ctx.reply('Please provide a server id')
+    if  not server_id:
+        await ctx.reply('please provide a server id')
+        return
+
+    if not check_server_id(server_id, ctx):
         return
 
     data = get_json_response(API_ENDPOINT + str(server_id) + '/stats', 'failed to get server stats')
@@ -127,12 +144,17 @@ async def stats(ctx, server_id):
     server_info_text = print_server_status(data)
     await ctx.reply(f"Serverinformationen:\n{server_info_text}")
 
-
 # start a server
 @bot.hybrid_command(name='start', description='start a server')
 @app_commands.guilds(discord.Object(id=GUILD_ID))
-async def start(ctx, server_id):
+async def start(ctx, server_id: str = None):
     print('start')
+    if  not server_id:
+        await ctx.reply('please provide a server id')
+        return
+
+    if not check_server_id(server_id, ctx):
+        return
 
     # check if server is already running
     if is_server_running(server_id, ctx):
@@ -152,8 +174,14 @@ async def start(ctx, server_id):
 # stop a server
 @bot.hybrid_command(name='stop', description='stop a server')
 @app_commands.guilds(discord.Object(id=GUILD_ID))
-async def stop(ctx, server_id):
+async def stop(ctx, server_id: str = None):
     print('stop')
+    if  not server_id:
+        await ctx.reply('please provide a server id')
+        return
+
+    if not check_server_id(server_id, ctx):
+        return
 
     # check if server is already stopped
     if not is_server_running(server_id, ctx):
@@ -171,26 +199,42 @@ async def stop(ctx, server_id):
     else:
         await ctx.reply('failed to stop server')
 
-
-# show help
-# @bot.command()
-# @bot.tree.command(name='bot_help', description='Show help')
-@bot.hybrid_command(name='bot_help', description='Show help')
+# restart a server
+@bot.hybrid_command(name='restart', description='restart a server')
 @app_commands.guilds(discord.Object(id=GUILD_ID))
-async def bot_help(interaction: discord.Interaction):
-    print('help')
+async def restart(ctx, server_id: str = None):
+    print('restart')
+    if  not server_id:
+        await ctx.reply('please provide a server id')
+        return
 
-    help_text = """
-    ```
-    >list
-    >stats <server_id>
-    >start <server_id>
-    >stop <server_id>
-    ```
-    """
-    # await ctx.send(help_text)
-    await interaction.response.send_message(help_text)
+    if not check_server_id(server_id, ctx):
+        return
 
+    # check if server is already stopped
+    if not is_server_running(server_id, ctx):
+        await ctx.reply('Server already stopped')
+        return
+
+    # check if player is online
+    player_count = get_player_count(server_id, ctx)
+    if player_count != 0:
+        await ctx.reply(f'cannot restart server: {player_count} Player(s) online')
+        return
+
+    if stop_server(server_id):
+        await ctx.reply('Server stopped')
+    else:
+        await ctx.reply('failed to stop server')
+
+    data = get_json_response(API_ENDPOINT + str(server_id) + '/action/restart_server',
+                             'failed to restart server')
+    if not data:
+        await ctx.reply('failed to start server')
+        return
+
+    if data['status'] == "ok":
+        await ctx.reply('Server restarted')
 
 # command not found
 @bot.event
