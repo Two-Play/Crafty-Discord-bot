@@ -15,6 +15,6 @@ ENV DISCORD_TOKEN=;
 ENV CRAFTY_TOKEN=;
 ENV PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
-CMD [ "python", "./main.py" ]
+CMD [ "python", "./core/main.py" ]
 
 #ENTRYPOINT ["top", "-b"]
