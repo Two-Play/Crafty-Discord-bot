@@ -24,7 +24,8 @@
 
 ## Introduction
 
-> [!WARNING] This project is still in development and is not yet ready for production use. Please use it at your own risk.
+> [!WARNING] 
+> This project is still in development and is not yet ready for production use. Please use it at your own risk.
 
 This is a Discord bot that is designed to control the Crafty-Controller-4 server. This is useful if friends want to start a server and you want to control it from Discord.
 The bot is written in Python and uses the Discord.py library to interact with the 
@@ -71,8 +72,6 @@ server and obtain the user token. You can do this by following these steps:
     - COMMANDS
     - TERMINAL
     - PLAYERS
-    > [!IMPORTANT]  I don't know if the permissions are correct, but you can try it out. If it doesn't work, please let me know.
-    You can also use the "ALL" permission, but this is not recommended for security reasons.
 7. Enter a name for your user token (for example, "Crafty Bot Token")
 8. Click on "Create" to generate the user token
 9. Save your user token in a safe place (you will need it later)
@@ -80,6 +79,10 @@ server and obtain the user token. You can do this by following these steps:
 #### Discord Bot
 
 You will need to create a new Discord bot and obtain a bot token. You can do this by following these steps:
+
+> [!IMPORTANT]  
+> I don't know if the permissions are correct, but you can try it out. If it doesn't work, please let me know.
+    You can also use the "ALL" permission, but this is not recommended for security reasons.
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
 2. Click on "New Application"
@@ -101,8 +104,6 @@ You will need to create a new Discord bot and obtain a bot token. You can do thi
     - Use slash commands
     - Read Message History
     - Mention Everyone
-     > [!IMPORTANT]  I don't know if the permissions are correct, but you can try it out. If it doesn't work, please let me know.
-     You can also use the "ALL / Administration" permission, but this is not recommended for security reasons.
 15. Click on "Copy" under "OAuth2 URL" to copy the invite URL
 16. Paste the invite URL into your web browser
 17. Select the server you want to invite the bot to
@@ -115,13 +116,14 @@ Congratulations! Your bot has been invited to your server
 Installing the bot using Docker is the easiest way to get started. To do this, you will need to have Docker installed on your system. If you do not have Docker installed, you can download it from the [official Docker website](https://www.docker.com/get-started).
 
 
-> [!CAUTION] Replace `YOUR_DISCORD_TOKEN` with your Discord bot token, `YOUR_CRAFTY_TOKEN` with your Crafty Controller API token and `YOUR_CRAFTY_SERVER_URL` with the URL of your Crafty Controller server in 
+> [!IMPORTANT] 
+> Replace `YOUR_DISCORD_TOKEN` with your Discord bot token, `YOUR_CRAFTY_TOKEN` with your Crafty Controller API token and `YOUR_CRAFTY_SERVER_URL` with the URL of your Crafty Controller server in 
 the following format: `https://your-crafty-server-IP:PORT`.
 
 To install the bot using Docker, you will need to run the following command in your terminal:
 
 ```bash
-docker run -d --name crafty-bot -e DISCORD_TOKEN=YOUR_DISCORD_TOKEN -e CRAFTY_TOKEN=YOUR_CRAFTY_TOKEN -e SERVER_URL=YOUR_CRAFTY_SERVER_URL twoplay/craftybot:0.1
+docker run -d --name crafty-bot -e DISCORD_TOKEN=YOUR_DISCORD_TOKEN -e CRAFTY_TOKEN=YOUR_CRAFTY_TOKEN -e SERVER_URL=YOUR_CRAFTY_SERVER_URL twoplay/craftybot:latest
 ```
 
 
