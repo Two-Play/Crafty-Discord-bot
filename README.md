@@ -3,7 +3,6 @@
 ![GitHub License](https://img.shields.io/github/license/Two-Play/Crafty-Discord-bot)
 ![GitHub top language](https://img.shields.io/github/languages/top/Two-Play/Crafty-Discord-bot)
 ![GitHub contributors](https://img.shields.io/github/contributors/Two-Play/Crafty-Discord-bot)
-![GitHub Release Date](https://img.shields.io/github/release-date/Two-Play/Crafty-Discord-bot)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/d5b3f979005e4c52916f7fb741068483)](https://app.codacy.com/gh/Two-Play/Crafty-Discord-bot/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/d5b3f979005e4c52916f7fb741068483)](https://app.codacy.com/gh/Two-Play/Crafty-Discord-bot/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 
@@ -25,6 +24,8 @@
 
 ## Introduction
 
+> [!WARNING] This project is still in development and is not yet ready for production use. Please use it at your own risk.
+
 This is a Discord bot that is designed to control the Crafty-Controller-4 server. This is useful if friends want to start a server and you want to control it from Discord.
 The bot is written in Python and uses the Discord.py library to interact with the 
 Discord API.
@@ -34,11 +35,13 @@ Discord API.
 - **Server Status**: Get the status of the server
 - **Server Start**: Start the server
 - **Server Stop**: Stop the server
+- **Server Restart**: Restart the server
+- **Server List**: Get a list of all servers
 
 ## Roadmap
 
-- **Server Restart**: Restart the server
 - **Server Backup**: Create a backup of the server
+- **Auto complete (slash commands)**: Auto complete the server ID
 - **Web UI**: Create a web interface for the bot
 
 
@@ -68,7 +71,7 @@ server and obtain the user token. You can do this by following these steps:
     - COMMANDS
     - TERMINAL
     - PLAYERS
-    > INFO: I don't know if the permissions are correct, but you can try it out. If it doesn't work, please let me know.
+    > [!IMPORTANT]  I don't know if the permissions are correct, but you can try it out. If it doesn't work, please let me know.
     You can also use the "ALL" permission, but this is not recommended for security reasons.
 7. Enter a name for your user token (for example, "Crafty Bot Token")
 8. Click on "Create" to generate the user token
@@ -98,7 +101,7 @@ You will need to create a new Discord bot and obtain a bot token. You can do thi
     - Use slash commands
     - Read Message History
     - Mention Everyone
-    > INFO: I don't know if the permissions are correct, but you can try it out. If it doesn't work, please let me know.
+     > [!IMPORTANT]  I don't know if the permissions are correct, but you can try it out. If it doesn't work, please let me know.
      You can also use the "ALL / Administration" permission, but this is not recommended for security reasons.
 15. Click on "Copy" under "OAuth2 URL" to copy the invite URL
 16. Paste the invite URL into your web browser
@@ -112,7 +115,7 @@ Congratulations! Your bot has been invited to your server
 Installing the bot using Docker is the easiest way to get started. To do this, you will need to have Docker installed on your system. If you do not have Docker installed, you can download it from the [official Docker website](https://www.docker.com/get-started).
 
 
->Replace `YOUR_DISCORD_TOKEN` with your Discord bot token, `YOUR_CRAFTY_TOKEN` with your Crafty Controller API token and `YOUR_CRAFTY_SERVER_URL` with the URL of your Crafty Controller server in 
+> [!CAUTION] Replace `YOUR_DISCORD_TOKEN` with your Discord bot token, `YOUR_CRAFTY_TOKEN` with your Crafty Controller API token and `YOUR_CRAFTY_SERVER_URL` with the URL of your Crafty Controller server in 
 the following format: `https://your-crafty-server-IP:PORT`.
 
 To install the bot using Docker, you will need to run the following command in your terminal:
@@ -128,7 +131,7 @@ Or you can use the following `docker-compose.yml` file:
 ```yaml
 services:
   crafty-bot:
-    image: twoplay/craftybot:0.1
+    image: twoplay/craftybot:latest
     container_name: crafty-bot
     environment:
       - DISCORD_TOKEN=YOUR_DISCORD_TOKEN
@@ -177,17 +180,26 @@ SERVER_URL=
 DISCORD_TOKEN=
 CRAFTY_TOKEN=
 
-#For the login command (optional)
+#For the get_token command (optional, not recommended). This are the credentials of the Crafty Controller user
 USERNAME=
 PASSWORD=
 ```
 
 Start the bot
 ```bash
+cd core
 python main.py
 ```
 
-Replace `YOUR_DISCORD_TOKEN` with your Discord bot token and `YOUR_MONGO_URI` with your MongoDB connection string.
+Replace `YOUR_DISCORD_TOKEN` with your Discord bot token and `CRAFTY_TOKEN` with your Crafty Controller API token.
+
+#### Update
+For updating the bot, you can use the following command:
+```bash
+# Change into the project directory and pull the latest changes
+cd Crafty-Discord-bot
+git pull
+```
 
 ## Usage
 
@@ -195,14 +207,29 @@ Replace `YOUR_DISCORD_TOKEN` with your Discord bot token and `YOUR_MONGO_URI` wi
 
 The bot supports slash commands. To use the slash commands, you will need to have the `Use slash commands` permission enabled for the bot.
 ```bash
-  /help or /bot_help
+  /help
 ```
 
 ### Command (>)
 
 Enter the following command to get a list of available commands:
 ```bash
-  >help or >bot_help
+  >help
+```
+
+To get the status of the server, enter the following command:
+```bash
+  >status
+```
+
+To start the server, enter the following command:
+```bash
+  >start [server_id]
+```
+replace `[server_id]` with the ID of the server you want to start. You can get the server ID by entering the `>list` command.
+For example:
+```bash
+  >start da459ce3-6964-46b8-bb21-1c3e753b6ba9
 ```
 
 ## Issues
