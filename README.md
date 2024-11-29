@@ -176,16 +176,10 @@ Download the required dependencies
 pip install -r requirements.txt
 ```
 
-To run the bot, you will need to create a `.env` file in the root directory of the project and add the following environment variables:
-```bash
-SERVER_URL=
-DISCORD_TOKEN=
-CRAFTY_TOKEN=
+To run the bot, you will need to copy the `.env.example` file to a new file called `.env` and fill in the required fields.
+Only the `DISCORD_TOKEN` and `CRAFTY_TOKEN` fields are required to run the bot. If you want to use slash commands, you will need to fill in the `GUILD_ID` field as well.
 
-#For the get_token command (optional, not recommended). This are the credentials of the Crafty Controller user
-USERNAME=
-PASSWORD=
-```
+```bash
 
 Start the bot
 ```bash
@@ -206,6 +200,15 @@ git pull
 ## Usage
 
 ### Slash Commands (Beta)
+To use slash commands, you will need to set the `GUILD_ID` in the `.env` file. You can get the `GUILD_ID` by enabling the `Developer Mode` in Discord and right-clicking on the server name.
+
+To get the slash commands, enter the following command:
+```bash
+  >clear
+  >commands
+  >sync
+```
+Hopefully, the bot will know the commands. It is still in beta, so it may not work as expected.
 
 The bot supports slash commands. To use the slash commands, you will need to have the `Use slash commands` permission enabled for the bot.
 ```bash
