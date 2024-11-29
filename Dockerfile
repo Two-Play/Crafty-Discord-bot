@@ -1,5 +1,5 @@
 FROM python:3.9-slim
-LABEL authors="philippe"
+LABEL authors="Philippe Westenfelder"
 
 WORKDIR /usr/src/app
 
@@ -8,11 +8,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-ENV USERNAME=;
-ENV PASSWORD=;
-ENV SERVER_URL=;
-ENV DISCORD_TOKEN=;
-ENV CRAFTY_TOKEN=;
 ENV PYTHONWARNINGS="ignore:Unverified HTTPS request"
 
 CMD [ "python", "./core/main.py" ]
