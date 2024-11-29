@@ -104,6 +104,7 @@ async def sync(ctx) -> None:
     # add commands to the app commands
     await ctx.reply("{} commands synced".format(len(synced)))
 
+
 @bot.hybrid_command(name='clear', description='Clear all slash commands')
 @app_commands.guilds(discord.Object(id=GUILD_ID))
 @is_owner()
@@ -112,6 +113,7 @@ async def clear(ctx) -> None:
     bot.tree.clear_commands(guild=discord.Object(id=GUILD_ID))
     await ctx.reply("All commands cleared")
 
+
 @bot.hybrid_command(name='commands', description='Get all slash commands')
 @app_commands.guilds(discord.Object(id=GUILD_ID))
 @is_owner()
@@ -119,6 +121,7 @@ async def commands(ctx) -> None:
     print('commands')
     commands = bot.tree.get_commands(guild=discord.Object(id=GUILD_ID))
     await ctx.reply(f"Got {len(commands)} commands")
+
 
 @bot.hybrid_command(name='get_token', description='get token if not set (not recommended)')
 @app_commands.guilds(discord.Object(id=GUILD_ID))
