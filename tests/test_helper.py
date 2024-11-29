@@ -51,13 +51,16 @@ class TestCheckEmptyEnvVars(unittest.TestCase):
         with self.assertRaises(SystemExit):
             check_env_vars()
 
-    @patch.dict(os.environ, {'SERVER_URL': 'http://example.com', 'DISCORD_TOKEN': 'token', 'CRAFTY_TOKEN': '', 'USERNAME': '', 'PASSWORD': ''})
+    @patch.dict(os.environ,
+                {'SERVER_URL': 'http://example.com', 'DISCORD_TOKEN': 'token', 'CRAFTY_TOKEN': '', 'USERNAME': '',
+                 'PASSWORD': ''})
     def test_empty_crafty_token_and_empty_credentials(self):
         with self.assertRaises(SystemExit):
             check_env_vars()
 
-
-    @patch.dict(os.environ, {'SERVER_URL': 'http://example.com', 'DISCORD_TOKEN': 'token', 'CRAFTY_TOKEN': '', 'USERNAME': 'Bla', 'PASSWORD': ''})
+    @patch.dict(os.environ,
+                {'SERVER_URL': 'http://example.com', 'DISCORD_TOKEN': 'token', 'CRAFTY_TOKEN': '', 'USERNAME': 'Bla',
+                 'PASSWORD': ''})
     def test_empty_crafty_token_and_empty_password(self):
         with self.assertRaises(SystemExit):
             check_env_vars()
@@ -70,6 +73,6 @@ class TestCheckServerId(unittest.TestCase):
     def test_invalid_server_id(self):
         self.assertFalse(check_server_id('abc'))
 
+
 if __name__ == '__main__':
     unittest.main()
-

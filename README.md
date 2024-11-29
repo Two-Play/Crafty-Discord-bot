@@ -24,11 +24,12 @@
 
 ## Introduction
 
-> [!WARNING] 
+> [!WARNING]
 > This project is still in development and is not yet ready for production use. Please use it at your own risk.
 
-This is a Discord bot that is designed to control the Crafty-Controller-4 server. This is useful if friends want to start a server and you want to control it from Discord.
-The bot is written in Python and uses the Discord.py library to interact with the 
+This is a Discord bot that is designed to control the Crafty-Controller-4 server. This is useful if friends want to
+start a server and you want to control it from Discord.
+The bot is written in Python and uses the Discord.py library to interact with the
 Discord API.
 
 ### Features
@@ -45,8 +46,6 @@ Discord API.
 - **Auto complete (slash commands)**: Auto complete the server ID
 - **Web UI**: Create a web interface for the bot
 
-
-
 ## Installation
 
 To install the bot, you will need to have a few things set up first.
@@ -55,7 +54,7 @@ To install the bot, you will need to have a few things set up first.
 
 #### Server
 
-You should have a Server to deploy this bot. You can use a VPS, local server or a Raspberry Pi. 
+You should have a Server to deploy this bot. You can use a VPS, local server or a Raspberry Pi.
 You can also use your own computer, but it is not recommended for availability reasons.
 
 #### Crafty Controller user
@@ -82,13 +81,14 @@ You will need to create a new Discord bot and obtain a bot token. You can do thi
 
 > [!IMPORTANT]  
 > I don't know if the permissions are correct, but you can try it out. If it doesn't work, please let me know.
-    You can also use the "ALL" permission, but this is not recommended for security reasons.
+> You can also use the "ALL" permission, but this is not recommended for security reasons.
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
 2. Click on "New Application"
 3. Enter a name for your bot (for example, "Crafty Bot")
 4. Accept the terms and click on "Create"
-5. If you want to add an icon to your bot, click on "General Information" in the left-hand menu and then click on "Upload Image" under "App Icon"
+5. If you want to add an icon to your bot, click on "General Information" in the left-hand menu and then click on "
+   Upload Image" under "App Icon"
 6. Click on "Bot" in the left-hand menu
 7. Under "username", you can change the name of your bot if you wish
 8. Disable the "Public Bot" option
@@ -97,7 +97,7 @@ You will need to create a new Discord bot and obtain a bot token. You can do thi
 11. Save your bot token in a safe place (you will need it later)
 12. Click on "OAuth2" in the left-hand menu
 13. Under "Scopes", select "bot"
-14. Under "Bot Permissions", select 
+14. Under "Bot Permissions", select
     - View Channels
     - Send Messages
     - Create public threads
@@ -113,20 +113,21 @@ Congratulations! Your bot has been invited to your server
 
 ### Docker
 
-Installing the bot using Docker is the easiest way to get started. To do this, you will need to have Docker installed on your system. If you do not have Docker installed, you can download it from the [official Docker website](https://www.docker.com/get-started).
+Installing the bot using Docker is the easiest way to get started. To do this, you will need to have Docker installed on
+your system. If you do not have Docker installed, you can download it from
+the [official Docker website](https://www.docker.com/get-started).
 
 
-> [!IMPORTANT] 
-> Replace `YOUR_DISCORD_TOKEN` with your Discord bot token, `YOUR_CRAFTY_TOKEN` with your Crafty Controller API token and `YOUR_CRAFTY_SERVER_URL` with the URL of your Crafty Controller server in 
-the following format: `https://your-crafty-server-IP:PORT`.
+> [!IMPORTANT]
+> Replace `YOUR_DISCORD_TOKEN` with your Discord bot token, `YOUR_CRAFTY_TOKEN` with your Crafty Controller API token
+> and `YOUR_CRAFTY_SERVER_URL` with the URL of your Crafty Controller server in
+> the following format: `https://your-crafty-server-IP:PORT`.
 
 To install the bot using Docker, you will need to run the following command in your terminal:
 
 ```bash
 docker run -d --name crafty-bot -e DISCORD_TOKEN=YOUR_DISCORD_TOKEN -e CRAFTY_TOKEN=YOUR_CRAFTY_TOKEN -e SERVER_URL=YOUR_CRAFTY_SERVER_URL twoplay/craftybot:latest
 ```
-
-
 
 Or you can use the following `docker-compose.yml` file:
 
@@ -147,37 +148,46 @@ services:
 If you would like to install the bot using Python, you will need to have Python 3.8 or higher installed on your system.
 
 Clone the repository
+
 ```bash
 git clone https://github.com/Two-Play/Crafty-Discord-bot.git
 ```
 
 Change into the project directory
+
 ```bash
 cd Crafty-Discord-bot
 ```
 
 Create a virtual environment
+
 ```bash
 python -m venv venv
 ```
 
 Activate the virtual environment
 On Linux and macOS:
+
 ```bash
 source venv/bin/activate
 ```
+
 On Windows:
+
 ```bash
 venv\Scripts\activate
 ```
 
 Download the required dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
-To run the bot, you will need to copy the `.env.example` file to a new file called `.env` and fill in the required fields.
-Only the `DISCORD_TOKEN` and `CRAFTY_TOKEN` fields are required to run the bot. If you want to use slash commands, you will need to fill in the `GUILD_ID` field as well.
+To run the bot, you will need to copy the `.env.example` file to a new file called `.env` and fill in the required
+fields.
+Only the `DISCORD_TOKEN` and `CRAFTY_TOKEN` fields are required to run the bot. If you want to use slash commands, you
+will need to fill in the `GUILD_ID` field as well.
 
 ```bash
 
@@ -190,7 +200,9 @@ python main.py
 Replace `YOUR_DISCORD_TOKEN` with your Discord bot token and `CRAFTY_TOKEN` with your Crafty Controller API token.
 
 #### Update
+
 For updating the bot, you can use the following command:
+
 ```bash
 # Change into the project directory and pull the latest changes
 cd Crafty-Discord-bot
@@ -200,17 +212,23 @@ git pull
 ## Usage
 
 ### Slash Commands (Beta)
-To use slash commands, you will need to set the `GUILD_ID` in the `.env` file. You can get the `GUILD_ID` by enabling the `Developer Mode` in Discord and right-clicking on the server name.
+
+To use slash commands, you will need to set the `GUILD_ID` in the `.env` file. You can get the `GUILD_ID` by enabling
+the `Developer Mode` in Discord and right-clicking on the server name.
 
 To get the slash commands, enter the following command:
+
 ```bash
   >clear
   >commands
   >sync
 ```
+
 Hopefully, the bot will know the commands. It is still in beta, so it may not work as expected.
 
-The bot supports slash commands. To use the slash commands, you will need to have the `Use slash commands` permission enabled for the bot.
+The bot supports slash commands. To use the slash commands, you will need to have the `Use slash commands` permission
+enabled for the bot.
+
 ```bash
   /help
 ```
@@ -218,28 +236,34 @@ The bot supports slash commands. To use the slash commands, you will need to hav
 ### Command (>)
 
 Enter the following command to get a list of available commands:
+
 ```bash
   >help
 ```
 
 To get the status of the server, enter the following command:
+
 ```bash
   >status
 ```
 
 To start the server, enter the following command:
+
 ```bash
   >start [server_id]
 ```
-replace `[server_id]` with the ID of the server you want to start. You can get the server ID by entering the `>list` command.
+
+replace `[server_id]` with the ID of the server you want to start. You can get the server ID by entering the `>list`
+command.
 For example:
+
 ```bash
   >start da459ce3-6964-46b8-bb21-1c3e753b6ba9
 ```
 
 ## Issues
 
-If you encounter any issues while using the bot, please report them on the 
+If you encounter any issues while using the bot, please report them on the
 [GitHub Issues](https://github.com/Two-Play/Crafty-Discord-bot/issues) page.
 
 ## Contributing
@@ -254,7 +278,7 @@ If you would like to contribute to the project, please follow these steps:
 6. Create a new Pull Request
 7. Wait for your Pull Request to be reviewed
 8. Once your Pull Request is approved, it will be merged into the main branch
-9. Congratulations! You have successfully contributed to the project 
+9. Congratulations! You have successfully contributed to the project
 
 Thank you for your contribution!
 
@@ -278,10 +302,10 @@ If you would like to donate to the project, you can do so using the following me
 | ![Buy Me A Coffee Badge](https://img.shields.io/badge/Buy%20Me%20A%20Coffee-FD0?logo=buymeacoffee&logoColor=000&style=for-the-badge) | [Buy Me a Coffee](https://www.buymeacoffee.com/TwoPlay)                 | ![Buy Me a Coffee QR Code](https://api.qrserver.com/v1/create-qr-code/?color=000000&bgcolor=FFFFFF&data=https://www.buymeacoffee.com/TwoPlay&qzone=1&margin=0&size=150x150&ecc=L)                 |
 | ![PayPal Badge](https://img.shields.io/badge/PayPal-003087?logo=paypal&logoColor=fff&style=for-the-badge)                            | [PayPal](https://www.paypal.com/donate/?hosted_button_id=RQAUT43DDLTJG) | ![PayPal QR Code](https://api.qrserver.com/v1/create-qr-code/?color=000000&bgcolor=FFFFFF&data=https://www.paypal.com/donate/?hosted_button_id=RQAUT43DDLTJG&qzone=1&margin=0&size=150x150&ecc=L) |
 
-
 ### Cryptocurrency Donations
 
-You can click on the QR code to show a larger version of the QR code. GitHub does not support displaying large images in the README file.
+You can click on the QR code to show a larger version of the QR code. GitHub does not support displaying large images in
+the README file.
 
 | Cryptocurrency                                                                                                  | Abbreviation | <div style="min-width:150px">QR-Code</div>                                                                                                                                                                                          | Address                                                                                           |
 |:----------------------------------------------------------------------------------------------------------------|:-------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------------------------------------------------------------------------------------------|

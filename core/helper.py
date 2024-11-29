@@ -46,7 +46,8 @@ def check_env_vars():
             print(f'{var} not set')
             sys.exit()
 
-async def check_server_id(server_id: str, ctx = None) -> bool:
+
+async def check_server_id(server_id: str, ctx=None) -> bool:
     """
     Check if the server ID is valid.
 
@@ -65,5 +66,5 @@ async def check_server_id(server_id: str, ctx = None) -> bool:
     except ValueError:
         print('Invalid server ID')
         if ctx:
-             await ctx.reply('Invalid server ID')
+            await ctx.reply('Invalid server ID')
         return False

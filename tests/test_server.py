@@ -36,5 +36,6 @@ class TestServerFunctions(unittest.TestCase):
         mock_get_json_response.return_value = {}
         self.assertFalse(is_server_running(1))
 
+
 if __name__ == '__main__':
     unittest.main()

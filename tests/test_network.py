@@ -6,6 +6,7 @@ import requests
 
 from core.network import is_response_successful, get_response, get_json_response
 
+
 class TestNetwork(unittest.TestCase):
 
     @patch('core.network.requests.get')
