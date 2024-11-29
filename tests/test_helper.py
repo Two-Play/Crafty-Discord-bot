@@ -2,7 +2,8 @@ import os
 import unittest
 from unittest.mock import patch
 
-from core.helper import check_env_vars
+from core.helper import check_env_vars, check_server_id
+
 
 class TestCheckEnvVars(unittest.TestCase):
     @patch.dict(os.environ, {'SERVER_URL': 'http://example.com', 'DISCORD_TOKEN': 'token', 'CRAFTY_TOKEN': 'token'})
@@ -61,6 +62,13 @@ class TestCheckEmptyEnvVars(unittest.TestCase):
         with self.assertRaises(SystemExit):
             check_env_vars()
 
+
+class TestCheckServerId(unittest.TestCase):
+    def test_valid_server_id(self):
+        self.assertTrue(check_server_id('ff231030-910c-4aaa-bd83-50e03aedab1c'))
+
+    def test_invalid_server_id(self):
+        self.assertFalse(check_server_id('abc'))
 
 if __name__ == '__main__':
     unittest.main()

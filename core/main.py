@@ -65,7 +65,7 @@ async def on_ready():
     try:
         if 'ENABLE' in os.environ and os.environ['ENABLE'] == 'true':
             print('auto stop enabled')
-            #bot.loop.create_task(auto_stop())
+            # bot.loop.create_task(auto_stop())
             await auto_stop()
         else:
             print('auto stop disabled')
@@ -73,7 +73,9 @@ async def on_ready():
         print(e)
     # get_token()
 
+
 from discord.ext import commands
+
 
 # @bot.tree.command(name="rps")/*
 # @app_commands.guilds(discord.Object(id=GUILD_ID))@app_commands.choices(choices=[
@@ -129,11 +131,11 @@ async def get_list(ctx):
 @app_commands.guilds(discord.Object(id=GUILD_ID))
 async def stats(ctx, server_id: str = commands.parameter(default=None, description="Server ID", )):
     print('stats')
-    if  not server_id:
+    if not server_id:
         await ctx.reply('please provide a server id')
         return
 
-    if not check_server_id(server_id, ctx):
+    if not await check_server_id(server_id, ctx):
         return
 
     data = get_json_response(API_ENDPOINT + str(server_id) + '/stats', 'failed to get server stats')
@@ -144,16 +146,17 @@ async def stats(ctx, server_id: str = commands.parameter(default=None, descripti
     server_info_text = print_server_status(data)
     await ctx.reply(f"Serverinformationen:\n{server_info_text}")
 
+
 # start a server
 @bot.hybrid_command(name='start', description='start a server')
 @app_commands.guilds(discord.Object(id=GUILD_ID))
 async def start(ctx, server_id: str = None):
     print('start')
-    if  not server_id:
+    if not server_id:
         await ctx.reply('please provide a server id')
         return
 
-    if not check_server_id(server_id, ctx):
+    if not await check_server_id(server_id, ctx):
         return
 
     # check if server is already running
@@ -176,11 +179,11 @@ async def start(ctx, server_id: str = None):
 @app_commands.guilds(discord.Object(id=GUILD_ID))
 async def stop(ctx, server_id: str = None):
     print('stop')
-    if  not server_id:
+    if not server_id:
         await ctx.reply('please provide a server id')
         return
 
-    if not check_server_id(server_id, ctx):
+    if not await check_server_id(server_id, ctx):
         return
 
     # check if server is already stopped
@@ -199,16 +202,17 @@ async def stop(ctx, server_id: str = None):
     else:
         await ctx.reply('failed to stop server')
 
+
 # restart a server
 @bot.hybrid_command(name='restart', description='restart a server')
 @app_commands.guilds(discord.Object(id=GUILD_ID))
 async def restart(ctx, server_id: str = None):
     print('restart')
-    if  not server_id:
+    if not server_id:
         await ctx.reply('please provide a server id')
         return
 
-    if not check_server_id(server_id, ctx):
+    if not await check_server_id(server_id, ctx):
         return
 
     # check if server is already stopped
@@ -236,6 +240,7 @@ async def restart(ctx, server_id: str = None):
     if data['status'] == "ok":
         await ctx.reply('Server restarted')
 
+
 # command not found
 @bot.event
 async def on_command_error(ctx, error):
@@ -243,7 +248,7 @@ async def on_command_error(ctx, error):
     Handle command not found errors
     """
     if isinstance(error, commands.CommandNotFound):
-        await ctx.send('Command not found. Use `>bot_help` to get a list of available commands.')
+        await ctx.send('Command not found. Use `>help` to get a list of available commands.')
 
 
 bot.run(os.environ['DISCORD_TOKEN'])
