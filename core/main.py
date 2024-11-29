@@ -15,16 +15,17 @@ from dotenv import load_dotenv
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from core.constants import AUTO_STOP_SLEEP, GUILD_ID, API_ENDPOINT
 from core.helper import check_env_vars, check_server_id
-from core.network import get_json_response
-from core.printing import print_server_info, print_server_status
-from core.server import is_server_running, stop_server, get_player_count
-from core.custom_help_command import CustomHelpCommand
 
 # Load environment variables from .env file
 load_dotenv()
 check_env_vars()
+
+from core.network import get_json_response
+from core.printing import print_server_info, print_server_status
+from core.server import is_server_running, stop_server, get_player_count
+from core.custom_help_command import CustomHelpCommand
+from core.constants import AUTO_STOP_SLEEP_TIME, GUILD_ID, API_ENDPOINT
 
 SERVER_URL = os.environ['SERVER_URL']
 if 'USERNAME' in os.environ and 'PASSWORD' in os.environ:
@@ -54,16 +55,18 @@ async def auto_stop():
             if is_server_running(server_id) and get_player_count(server_id) == 0:
                 stop_server(server_id)
 
-        await asyncio.sleep(AUTO_STOP_SLEEP)  # task runs every hour
+        await asyncio.sleep(AUTO_STOP_SLEEP_TIME)  # task runs every hour
 
 
 @bot.event
 async def on_ready():
     print('Bot is ready. {}'.format(bot.user))
-    print("Crafty Bot version 0.1")
+    print("Crafty Bot version 0.1.1")
+    print("Server URL: {}".format(SERVER_URL))
+    print("GUILD ID: {}".format(GUILD_ID))
 
     try:
-        if 'ENABLE' in os.environ and os.environ['ENABLE'] == 'true':
+        if 'ENABLE_AUTO_STOP_SERVER' in os.environ and os.environ['ENABLE_AUTO_STOP_SERVER'] == 'true':
             print('auto stop enabled')
             # bot.loop.create_task(auto_stop())
             await auto_stop()
@@ -96,6 +99,7 @@ from discord.ext import commands
 @app_commands.guilds(discord.Object(id=GUILD_ID))
 @is_owner()
 async def sync(ctx) -> None:
+    print('sync')
     synced = await bot.tree.sync(guild=discord.Object(id=GUILD_ID))
     # add commands to the app commands
     await ctx.reply("{} commands synced".format(len(synced)))
