@@ -1,7 +1,7 @@
 """This module contains the Server class."""
 
 from core.constants import API_ENDPOINT
-from core.network import get_json_response
+from core.network import get_json_response, HttpMethod
 
 
 def stop_server(server_id) -> bool:
@@ -9,7 +9,7 @@ def stop_server(server_id) -> bool:
     Stop the server with the specified ID.
     """
     data = get_json_response(API_ENDPOINT + str(server_id) + '/action/stop_server',
-                             'failed to stop server')
+                             'failed to stop server', method=HttpMethod.POST)
     if data['status'] == "ok":
         print('Server stopped', str(server_id))
         return True
