@@ -4,9 +4,13 @@ This module contains helper different functions.
 
 import os
 import sys
+import time
 import uuid
 
-from discord.app_commands import commands
+import discord
+from discord import app_commands
+
+from core.network import get_json_response
 
 
 def check_env_vars():
@@ -62,9 +66,40 @@ async def check_server_id(server_id: str, ctx=None) -> bool:
     try:
         print('Checking server ID')
         uuid.UUID(server_id, version=4)
-        return True
     except ValueError:
         print('Invalid server ID')
         if ctx:
             await ctx.reply('Invalid server ID')
         return False
+    print('Valid server ID')
+    return True
+
+
+# Global variables for caching
+cached_server_list = None
+cache_timestamp = 0
+CACHE_DURATION = 60  # Cache duration in seconds (e.g., 1 minute)
+
+
+async def get_server_list(interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+    global cached_server_list, cache_timestamp
+
+    # Check if the cache is still valid
+    if cached_server_list is not None and (time.time() - cache_timestamp) < CACHE_DURATION:
+        data = cached_server_list
+    else:
+        data = get_json_response('/api/v2/servers', 'failed to get server list')
+        if not data:
+            return [app_commands.Choice(name='failed to get server list', value='failed to get server list')]
+        cached_server_list = data
+        cache_timestamp = time.time()
+
+    data = data['data']
+    server_uuid = []
+    server_name = []
+    for server in data:
+        server_uuid.append(server['server_id'])
+        server_name.append(server['server_name'])
+    server_list = [app_commands.Choice(name=server_name[i], value=server_uuid[i]) for i in range(len(server_uuid)) if
+                   server_name[i].lower().startswith(current.lower())]
+    return server_list

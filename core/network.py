@@ -1,14 +1,17 @@
-"""
-This module contains functions for sending HTTP requests and handling responses.
-"""
-
 import json
 import os
 import requests
 from requests import Response
+from enum import Enum
 
 from core.constants import STATUS_SUCCESS
 
+class HttpMethod(Enum):
+    GET = 'GET'
+    POST = 'POST'
+    PUT = 'PUT'
+    DELETE = 'DELETE'
+    PATCH = 'PATCH'
 
 def is_response_successful(response: requests.Response) -> bool:
     """
@@ -22,42 +25,39 @@ def is_response_successful(response: requests.Response) -> bool:
     """
     return response.status_code == STATUS_SUCCESS
 
-
-def get_response(path: str, verify: bool = False, timeout: int = 6) -> Response:
+def send_request(path: str, verify: bool = False, timeout: int = 6, data: dict = None, method: HttpMethod = HttpMethod.GET) -> Response:
     """
-    Send a GET request to the specified path and return the response.
+    Send an HTTP request with the specified method to the given path and return the response.
 
     Args:
+        method (HttpMethod, optional): The HTTP method to use. Defaults to HttpMethod.GET.
         path (str): The URL path to send the request to.
         verify (bool, optional): Whether to verify the server's TLS certificate. Defaults to False.
         timeout (int, optional): The timeout for the request in seconds. Defaults to 6.
+        data (dict, optional): The data to send in the request body (for POST, PUT, etc.). Defaults to None.
 
     Returns:
         requests.Response: The HTTP response object.
     """
-    response = requests.get(
-        os.environ['SERVER_URL'] + path,
-        headers={'Authorization': 'Bearer ' + os.environ['CRAFTY_TOKEN']},
-        verify=verify,
-        timeout=timeout
-    )
+    url = os.environ['SERVER_URL'] + path
+    headers = {'Authorization': 'Bearer ' + os.environ['CRAFTY_TOKEN']}
+    response = requests.request(method.value, url, headers=headers, verify=verify, timeout=timeout, json=data)
     return response
 
-
-def get_json_response(path: str, error_message: str = "Error while response") -> json:
+def get_json_response(path: str, error_message: str = "Error while response", method: HttpMethod = HttpMethod.GET, data: dict = None) -> json:
     """
-    Send a GET request to the specified path and return the response as JSON.
+    Send an HTTP request with the specified method to the given path and return the response as JSON.
 
     Args:
+        method (HttpMethod, optional): The HTTP method to use. Defaults to HttpMethod.GET.
         path (str): The URL path to send the request to.
-        error_message (str, optional): The error message to print if the response is
-        not successful. Defaults to "Error while response".
+        error_message (str, optional): The error message to print if the response is not successful. Defaults to "Error while response".
+        data (dict, optional): The data to send in the request body (for POST, PUT, etc.). Defaults to None.
 
     Returns:
-        dict: The JSON response as a dictionary. Returns an empty dictionary
-        if the response is not successful.
+        dict: The JSON response as a dictionary. Returns an empty dictionary if the response is not successful.
     """
-    response = get_response(path)
+    response = send_request(path, method=method, data=data)
     if not is_response_successful(response):
         print(error_message)
         return {}
