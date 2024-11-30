@@ -1,3 +1,4 @@
+import asyncio
 import os
 import unittest
 from unittest.mock import patch
@@ -71,8 +72,9 @@ class TestCheckServerId(unittest.TestCase):
         self.assertTrue(check_server_id('ff231030-910c-4aaa-bd83-50e03aedab1c'))
 
     def test_invalid_server_id(self):
-        self.assertFalse(check_server_id('abc'))
-
+        loop = asyncio.get_event_loop()
+        result = loop.run_until_complete(check_server_id('abc'))
+        self.assertFalse(result)
 
 if __name__ == '__main__':
     unittest.main()
