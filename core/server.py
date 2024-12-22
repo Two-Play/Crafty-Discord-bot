@@ -1,8 +1,10 @@
 """This module contains the Server class."""
+import logging
 
 from core.constants import API_ENDPOINT
 from core.network import get_json_response, HttpMethod
 
+logger = logging.getLogger('CraftyDiscordBot')
 
 def stop_server(server_id) -> bool:
     """
@@ -11,10 +13,10 @@ def stop_server(server_id) -> bool:
     data = get_json_response(API_ENDPOINT + str(server_id) + '/action/stop_server',
                              'failed to stop server', method=HttpMethod.POST)
     if data['status'] == "ok":
-        print('Server stopped', str(server_id))
+        logger.debug('Server stopped', str(server_id))
         return True
 
-    print('failed to stop server')
+    logger.debug('failed to stop server')
     return False
 
 

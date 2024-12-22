@@ -1,10 +1,14 @@
 import json
+import logging
 import os
 import requests
 from requests import Response
 from enum import Enum
 
 from core.constants import STATUS_SUCCESS
+
+logger = logging.getLogger('CraftyDiscordBot')
+
 
 class HttpMethod(Enum):
     GET = 'GET'
@@ -45,7 +49,7 @@ def send_request(path: str, verify: bool = False, timeout: int = 6, data: dict =
         response = requests.request(method.value, url, headers=headers, verify=verify, timeout=timeout, json=data)
         return response
     except requests.RequestException as e:
-        print(f"Request failed: {e}")
+        logger.debug(f"Request failed: {e}")
         return Response()
 
 def get_json_response(path: str, error_message: str = "Error while response", method: HttpMethod = HttpMethod.GET, data: dict = None) -> json:
@@ -63,6 +67,6 @@ def get_json_response(path: str, error_message: str = "Error while response", me
     """
     response = send_request(path, method=method, data=data)
     if not is_response_successful(response):
-        print(error_message)
+        logger.debug(error_message)
         return {}
     return response.json()
