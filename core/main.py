@@ -21,7 +21,7 @@ logger.setLevel(logging.DEBUG)
 
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - [CraftyBot] - [%(levelname)s] -> %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
@@ -74,7 +74,7 @@ async def auto_stop():
 @bot.event
 async def on_ready():
     logger.info('Bot is ready. {}'.format(bot.user))
-    logger.debug("Crafty Bot version {}".format(CRAFTY_BOT_VERSION))
+    logger.info("Crafty Bot version {}".format(CRAFTY_BOT_VERSION))
     logger.debug("Server URL: {}".format(SERVER_URL))
     logger.debug("GUILD ID: {}".format(GUILD_ID))
 

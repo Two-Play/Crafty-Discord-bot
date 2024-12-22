@@ -1,7 +1,7 @@
 """
 This module contains helper different functions.
 """
-
+import logging
 import os
 import sys
 import time
@@ -12,6 +12,7 @@ from discord import app_commands
 
 from core.network import get_json_response
 
+logger = logging.getLogger('CraftyDiscordBot')
 
 def check_env_vars():
     """
@@ -38,16 +39,16 @@ def check_env_vars():
         required_env_vars.append('or CRAFTY_TOKEN')
 
     if required_env_vars:
-        print('Not all environment variables set')
+        logger.info('Not all environment variables set')
         for env_var in required_env_vars:
-            print(f'{env_var} not set')
+            logger.info(f'{env_var} not set')
         sys.exit()
 
-    print('All environment variables set')
+    logger.info('All environment variables set')
 
     for var in ['SERVER_URL', 'CRAFTY_TOKEN', 'DISCORD_TOKEN']:
         if not os.environ.get(var):
-            print(f'{var} not set')
+            logger.info(f'{var} not set')
             sys.exit()
 
 
@@ -64,14 +65,14 @@ async def check_server_id(server_id: str, ctx=None) -> bool:
     """
 
     try:
-        print('Checking server ID')
+        logger.debug('Checking server ID')
         uuid.UUID(server_id, version=4)
     except ValueError:
-        print('Invalid server ID')
+        logger.debug('Invalid server ID')
         if ctx:
             await ctx.reply('Invalid server ID')
         return False
-    print('Valid server ID')
+    logger.debug('Valid server ID')
     return True
 
 
