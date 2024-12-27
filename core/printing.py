@@ -1,6 +1,10 @@
 """
 This module contains functions to print the server information as text.
 """
+import logging
+
+logger = logging.getLogger('CraftyDiscordBot')
+
 
 
 def print_server_info(data) -> str:
