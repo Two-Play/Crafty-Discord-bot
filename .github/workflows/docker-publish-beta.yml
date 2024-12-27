@@ -3,9 +3,9 @@ name: Publish Docker Image
 on:
   push:
     tags:
-      - '*.*.*'
+      - '*.*.*-beta'
     branches:
-      - master
+      - develop
 
 jobs:
   build-and-push:
@@ -61,7 +61,7 @@ jobs:
         IMAGE_NAME="twoplay/craftybot"
         VERSION=$tag
 
-        docker push $IMAGE_NAME:latest
+        docker push $IMAGE_NAME:beta
         docker push $IMAGE_NAME:$VERSION
 
     # Push to GitHub Packages
