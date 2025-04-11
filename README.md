@@ -91,23 +91,24 @@ You will need to create a new Discord bot and obtain a bot token. You can do thi
    Upload Image" under "App Icon"
 6. Click on "Bot" in the left-hand menu
 7. Under "username", you can change the name of your bot if you wish
-8. Disable the "Public Bot" option
-9. Click on "Reset Token" and confirm by clicking on "Yes, do it!"
-10. "Copy" under "Token" to copy your bot token
-11. Save your bot token in a safe place (you will need it later)
-12. Click on "OAuth2" in the left-hand menu
-13. Under "Scopes", select "bot"
-14. Under "Bot Permissions", select
+8. Enable "Presence Intent", "Server Members Intent" and "Message Content Intent"
+9. Disable the "Public Bot" option
+10. Click on "Reset Token" and confirm by clicking on "Yes, do it!"
+11. "Copy" under "Token" to copy your bot token
+12. Save your bot token in a safe place (you will need it later)
+13. Click on "OAuth2" in the left-hand menu
+14. Under "Scopes", select "bot"
+15. Under "Bot Permissions", select
     - View Channels
     - Send Messages
     - Create public threads
     - Use slash commands
     - Read Message History
     - Mention Everyone
-15. Click on "Copy" under "OAuth2 URL" to copy the invite URL
-16. Paste the invite URL into your web browser
-17. Select the server you want to invite the bot to
-18. Click on "Authorize"
+16. Click on "Copy" under "OAuth2 URL" to copy the invite URL
+17. Paste the invite URL into your web browser
+18. Select the server you want to invite the bot to
+19. Click on "Authorize"
 
 Congratulations! Your bot has been invited to your server
 
