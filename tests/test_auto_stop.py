@@ -1,0 +1,45 @@
+import unittest
+from unittest.mock import AsyncMock, MagicMock
+
+from core.cogs.auto_stop import AutoStop
+from core.crafty import CraftyAPIError, ServerAction
+
+
+class TestAutoStop(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self):
+        self.client = MagicMock()
+        self.client.list_servers = AsyncMock(return_value=[{'server_id': 'idle'}, {'server_id': 'busy'},
+                                                           {'server_id': 'off'}])
+        self.client.get_stats = AsyncMock(side_effect=lambda server_id: {
+            'idle': {'running': True, 'online': 0},
+            'busy': {'running': True, 'online': 3},
+            'off': {'running': False, 'online': 0},
+        }[server_id])
+        self.client.run_action = AsyncMock()
+        self.cog = AutoStop(self.client, interval=60)
+
+    async def test_interval(self):
+        self.assertEqual(self.cog.stop_idle_servers.seconds, 60)
+
+    async def test_stops_only_idle_running_servers(self):
+        with self.assertLogs('core.cogs.auto_stop', level='INFO'):
+            await self.cog.stop_idle_servers.coro(self.cog)
+        self.client.run_action.assert_awaited_once_with('idle', ServerAction.STOP)
+
+    async def test_list_error_is_handled(self):
+        self.client.list_servers.side_effect = CraftyAPIError('down')
+        with self.assertLogs('core.cogs.auto_stop', level='WARNING'):
+            await self.cog.stop_idle_servers.coro(self.cog)
+        self.client.run_action.assert_not_awaited()
+
+    async def test_error_on_one_server_continues_with_others(self):
+        self.client.run_action.side_effect = CraftyAPIError('down')
+        self.client.list_servers.return_value = [{'server_id': 'idle'}, {'server_id': 'idle'}]
+        with self.assertLogs('core.cogs.auto_stop', level='WARNING'):
+            await self.cog.stop_idle_servers.coro(self.cog)
+        self.assertEqual(self.client.run_action.await_count, 2)
+
+
+if __name__ == '__main__':
+    unittest.main()
