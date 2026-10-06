@@ -145,7 +145,7 @@ services:
 
 ### Python
 
-If you would like to install the bot using Python, you will need to have Python 3.8 or higher installed on your system.
+If you would like to install the bot using Python, you will need to have Python 3.10 or higher installed on your system.
 
 Clone the repository
 
@@ -186,18 +186,26 @@ pip install -r requirements.txt
 
 To run the bot, you will need to copy the `.env.example` file to a new file called `.env` and fill in the required
 fields.
-Only the `DISCORD_TOKEN` and `CRAFTY_TOKEN` fields are required to run the bot. If you want to use slash commands, you
-will need to fill in the `GUILD_ID` field as well.
+
+| Variable                                | Required | Description                                                                    |
+|-----------------------------------------|----------|--------------------------------------------------------------------------------|
+| `SERVER_URL`                            | yes      | URL of your Crafty Controller, e.g. `https://your-crafty-server-IP:PORT`       |
+| `DISCORD_TOKEN`                         | yes      | Your Discord bot token                                                         |
+| `CRAFTY_TOKEN`                          | yes*     | Your Crafty Controller API token                                               |
+| `CRAFTY_USERNAME` / `CRAFTY_PASSWORD`   | yes*     | Crafty login, used instead of `CRAFTY_TOKEN` if no token is set (not recommended) |
+| `GUILD_ID`                              | no       | Discord server ID for the slash commands (without it they are synced globally) |
+| `ENABLE_AUTO_STOP_SERVER`               | no       | `true` to stop running servers without players automatically                   |
+| `AUTO_STOP_SLEEP_TIME`                  | no       | Interval of the auto stop check in seconds (default `1800`)                    |
+| `CRAFTY_VERIFY_SSL`                     | no       | `true` to verify the TLS certificate of Crafty (default `false`, self-signed)  |
+| `LOG_LEVEL`                             | no       | `DEBUG`, `INFO` (default), `WARNING` or `ERROR`                                |
+
+\* Either `CRAFTY_TOKEN` or `CRAFTY_USERNAME` and `CRAFTY_PASSWORD` must be set.
+
+Start the bot from the project directory
 
 ```bash
-
-Start the bot
-```bash
-cd core
-python main.py
+python -m core
 ```
-
-Replace `YOUR_DISCORD_TOKEN` with your Discord bot token and `CRAFTY_TOKEN` with your Crafty Controller API token.
 
 #### Update
 
