@@ -1,5 +1,6 @@
 import base64
 import errno
+import logging
 import math
 import socket
 import unittest
@@ -11,6 +12,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from core.config import Settings
 from core.crafty import CraftyAPIError
 from core.flags import FeatureFlags, FlagSaveError, flag_definitions
+from core.log import LOG_BUFFER, set_log_level
 from core.web.dashboard import DashboardStartError, WebDashboard, describe_bind_error, summarize_server
 
 SETTINGS = Settings(server_url='https://crafty.local', discord_token='discord', crafty_token='crafty',
@@ -60,6 +62,20 @@ class TestSummarizeServer(unittest.TestCase):
 class DashboardTestCase(unittest.IsolatedAsyncioTestCase):
 
     settings = SETTINGS
+
+    def setUp(self):
+        # The dashboard reads the shared log buffer and changes the level of the 'core' logger.
+        root = logging.getLogger()
+        saved = (root.level, logging.getLogger('core').level, LOG_BUFFER in root.handlers)
+        root.addHandler(LOG_BUFFER)
+        set_log_level('INFO')
+
+        def restore():
+            root.setLevel(saved[0])
+            logging.getLogger('core').setLevel(saved[1])
+            if not saved[2]:
+                root.removeHandler(LOG_BUFFER)
+        self.addCleanup(restore)
 
     async def asyncSetUp(self):
         self.bot = make_bot(self.settings)
@@ -135,6 +151,30 @@ class TestDashboard(DashboardTestCase):
             response = await self.client.get('/app.js')
         self.assertEqual(response.status, 500)
 
+    async def test_logs(self):
+        logging.getLogger('core.test').info('first entry')
+        data = await (await self.client.get('/api/logs')).json()
+        entry = next(entry for entry in reversed(data['entries']) if entry['logger'] == 'core.test')
+        self.assertEqual((entry['message'], entry['level']), ('first entry', 'INFO'))
+        self.assertEqual(data['level'], 'INFO')
+        self.assertEqual(data['levels'], ['DEBUG', 'INFO', 'WARNING', 'ERROR'])
+        self.assertFalse(data['editable'])
+
+        last_id = entry['id']
+        logging.getLogger('core.test').warning('second entry')
+        data = await (await self.client.get(f'/api/logs?after={last_id}')).json()
+        # The test server also writes an aiohttp access log, which the bot turns off.
+        self.assertEqual([entry['message'] for entry in data['entries'] if entry['logger'] == 'core.test'],
+                         ['second entry'])
+
+    async def test_logs_invalid_after(self):
+        response = await self.client.get('/api/logs?after=abc')
+        self.assertEqual(response.status, 400)
+
+    async def test_log_level_read_only_without_password(self):
+        response = await self.client.put('/api/log-level', json={'level': 'DEBUG'}, headers={'X-Crafty-Bot': '1'})
+        self.assertEqual(response.status, 403)
+
     async def test_flags_read_only_without_password(self):
         data = await (await self.client.get('/api/flags')).json()
         self.assertFalse(data['editable'])
@@ -206,10 +246,42 @@ class TestDashboardPassword(DashboardTestCase):
         self.assertEqual(response.status, 401)
 
     async def test_set_invalid_flag(self):
-        for name, body in (('nope', {'enabled': True}), ('command_stop', {'enabled': 'no'}), ('command_stop', [])):
+        for name, body in (('nope', {'enabled': True}), ('command_stop', {'enabled': 'no'})):
             with self.subTest(name=name, body=body), self.assertLogs('core.web.dashboard', level='WARNING'):
                 response = await self.put_flag(name, body)
                 self.assertEqual(response.status, 400)
+
+    async def test_set_flag_body_not_an_object(self):
+        response = await self.put_flag('command_stop', [])
+        self.assertEqual(response.status, 400)
+
+    async def put_level(self, level, headers=None):
+        headers = {**self.auth('secret'), 'X-Crafty-Bot': '1', **(headers or {})}
+        return await self.client.put('/api/log-level', json={'level': level}, headers=headers)
+
+    async def test_set_log_level(self):
+        with self.assertLogs('core.web.dashboard', level='WARNING') as logs:
+            response = await self.put_level('debug')
+        self.assertEqual(response.status, 200)
+        self.assertEqual((await response.json())['level'], 'DEBUG')
+        self.assertEqual(logging.getLogger('core').level, logging.DEBUG)
+        self.assertEqual(logging.getLogger().level, logging.INFO)  # libraries stay at INFO
+        self.assertIn('from INFO to DEBUG', logs.output[0])
+
+    async def test_set_invalid_log_level(self):
+        response = await self.put_level('LOUD')
+        self.assertEqual(response.status, 400)
+        self.assertEqual(logging.getLogger('core').level, logging.INFO)
+
+    async def test_set_log_level_without_csrf_header(self):
+        with self.assertLogs('core.web.dashboard', level='WARNING'):
+            response = await self.client.put('/api/log-level', json={'level': 'DEBUG'}, headers=self.auth('secret'))
+        self.assertEqual(response.status, 400)
+        self.assertEqual(logging.getLogger('core').level, logging.INFO)
+
+    async def test_logs_require_password(self):
+        response = await self.client.get('/api/logs')
+        self.assertEqual(response.status, 401)
 
     async def test_set_flag_invalid_json(self):
         response = await self.client.put('/api/flags/command_stop', data='{', headers={
