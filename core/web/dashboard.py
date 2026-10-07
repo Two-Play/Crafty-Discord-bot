@@ -8,9 +8,11 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+import errno
 import hmac
 import logging
 import math
+import socket
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -44,6 +46,23 @@ SECURITY_HEADERS = {
 }
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
+
+
+class DashboardStartError(Exception):
+    """Raised when the web server of the dashboard can't be started."""
+
+
+def describe_bind_error(exc: OSError, host: str, port: int) -> str:
+    """Turn the error of binding the web server into a message that says what to change."""
+    if exc.errno == errno.EADDRINUSE:
+        return f'port {port} is already in use, set WEB_PORT to a free port or stop the other program'
+    if exc.errno == errno.EACCES:
+        return f'no permission to use port {port}, use a port above 1023'
+    # asyncio drops the errno of EADDRNOTAVAIL and only says it could not bind on any address.
+    if (exc.errno == errno.EADDRNOTAVAIL or isinstance(exc, socket.gaierror)
+            or str(exc).startswith('could not bind on any address')):
+        return f'WEB_HOST {host!r} is not an address of this machine, use 127.0.0.1 or 0.0.0.0'
+    return str(exc)
 
 
 def summarize_server(server: JsonDict, stats: Optional[JsonDict], error: Optional[str] = None) -> Dict[str, Any]:
@@ -90,10 +109,24 @@ class WebDashboard(commands.Cog):
         return app
 
     async def cog_load(self) -> None:
-        self._runner = web.AppRunner(self.app, access_log=None)
-        await self._runner.setup()
+        """
+        Start the web server.
+
+        Raises:
+            DashboardStartError: If the server can't listen on WEB_HOST:WEB_PORT. Nothing is
+                left running in that case.
+        """
         settings = self.bot.settings
-        await web.TCPSite(self._runner, settings.web_host, settings.web_port).start()
+        runner = web.AppRunner(self.app, access_log=None)
+        await runner.setup()
+        try:
+            await web.TCPSite(runner, settings.web_host, settings.web_port).start()
+        except OSError as exc:
+            await runner.cleanup()
+            raise DashboardStartError(
+                f'Cannot start the web dashboard on {settings.web_host}:{settings.web_port}: '
+                f'{describe_bind_error(exc, settings.web_host, settings.web_port)}') from exc
+        self._runner = runner
         logger.info('Web dashboard running on http://%s:%d%s', settings.web_host, settings.web_port,
                     '' if settings.web_password else ' (no WEB_PASSWORD set, anyone who can reach it can see it)')
 
@@ -132,7 +165,11 @@ class WebDashboard(commands.Cog):
     @staticmethod
     def _static_handler(file_name: str, content_type: str) -> Handler:
         async def handler(_request: web.Request) -> web.StreamResponse:
-            body = (STATIC_DIR / file_name).read_bytes()
+            try:
+                body = (STATIC_DIR / file_name).read_bytes()
+            except OSError as exc:
+                logger.error('Dashboard file %s cannot be read: %s', file_name, exc)
+                return web.Response(status=500, text='Dashboard files are missing, check the bot logs.')
             return web.Response(body=body, content_type=content_type, charset='utf-8')
         return handler
 
@@ -141,7 +178,11 @@ class WebDashboard(commands.Cog):
         return web.Response(text='ok')
 
     async def _status(self, _request: web.Request) -> web.StreamResponse:
-        return web.json_response(await self.snapshot())
+        try:
+            return web.json_response(await self.snapshot())
+        except Exception:  # pylint: disable=broad-exception-caught
+            logger.exception('Unexpected error while collecting the dashboard status')
+            return web.json_response({'error': 'Internal error, check the bot logs.'}, status=500)
 
     async def snapshot(self) -> Dict[str, Any]:
         """Return the current status, cached for a few seconds."""
@@ -161,6 +202,7 @@ class WebDashboard(commands.Cog):
             logger.warning('Dashboard could not load the server list: %s', exc)
             error = 'Crafty Controller is not reachable. Check the bot logs for details.'
         else:
+            server_list = [server for server in server_list if server.get('server_id')]
             results = await asyncio.gather(*(self.bot.crafty.get_stats(server['server_id'])
                                              for server in server_list), return_exceptions=True)
             for server, result in zip(server_list, results):
