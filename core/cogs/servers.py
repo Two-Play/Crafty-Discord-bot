@@ -11,7 +11,8 @@ from typing import List
 from discord import Interaction, app_commands
 from discord.ext import commands
 
-from core.crafty import CraftyAPIError, CraftyClient, JsonDict, ServerAction, parse_server_id
+from core.crafty import (CraftyAPIError, CraftyClient, JsonDict, ServerAction, busy_state, parse_server_id,
+                         player_count)
 from core.formatting import format_server_list, format_server_stats
 
 logger = logging.getLogger(__name__)
@@ -75,10 +76,14 @@ class ServerCommands(commands.Cog, name='Servers'):
             await ctx.reply('Server already stopped')
             return False
 
-        player_count = stats.get('online', 0)
-        if player_count:
-            await ctx.reply(f'cannot {verb} server: {player_count} Player(s) online')
+        players = player_count(stats)
+        if players:
+            await ctx.reply(f'cannot {verb} server: {players} Player(s) online')
             return False
+        if players is None:
+            # Without a working ping the player count is unknown. Don't block the command, since
+            # some servers never answer pings, but leave a trace in case players were kicked.
+            logger.warning('Player count of server %s is unknown, %s it anyway', server_id, verb)
         return True
 
     @commands.hybrid_command(name='list', description='get server list')
@@ -101,6 +106,10 @@ class ServerCommands(commands.Cog, name='Servers'):
         stats = await self._client.get_stats(server_id)
         if stats.get('running'):
             await ctx.reply('Server already running')
+            return
+        state = busy_state(stats)
+        if state:
+            await ctx.reply(f'Server is already {state}')
             return
 
         await self._client.run_action(server_id, ServerAction.START)

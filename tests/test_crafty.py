@@ -3,7 +3,8 @@ from unittest.mock import MagicMock
 
 import requests
 
-from core.crafty import CraftyAPIError, CraftyClient, ServerAction, parse_server_id
+from core.crafty import (CraftyAPIError, CraftyClient, ServerAction, busy_state, parse_server_id, player_count,
+                         player_names)
 
 SERVER_ID = 'ff231030-910c-4aaa-bd83-50e03aedab1c'
 
@@ -28,6 +29,34 @@ class TestParseServerId(unittest.TestCase):
         for value in ('abc', '', None, '../stats'):
             with self.subTest(value=value):
                 self.assertIsNone(parse_server_id(value))
+
+
+class TestStatsHelpers(unittest.TestCase):
+
+    def test_player_count(self):
+        self.assertEqual(player_count({'int_ping_results': 'True', 'online': 3}), 3)
+        self.assertEqual(player_count({'int_ping_results': 'True', 'online': 0}), 0)
+        self.assertEqual(player_count({'int_ping_results': True, 'online': 0}), 0)
+
+    def test_player_count_unknown_without_ping(self):
+        self.assertIsNone(player_count({'int_ping_results': 'False', 'online': 0}))
+        self.assertIsNone(player_count({'online': False}))
+        self.assertIsNone(player_count({}))
+
+    def test_player_count_positive_count_without_ping_flag(self):
+        self.assertEqual(player_count({'online': 2}), 2)
+
+    def test_player_names(self):
+        self.assertEqual(player_names({'players': "['Steve', 'Alex']"}), ['Steve', 'Alex'])
+        self.assertEqual(player_names({'players': ['Steve']}), ['Steve'])
+        self.assertEqual(player_names({'players': 'False'}), [])
+        self.assertEqual(player_names({'players': 'not a list ['}), [])
+        self.assertEqual(player_names({}), [])
+
+    def test_busy_state(self):
+        self.assertEqual(busy_state({'waiting_start': True}), 'starting')
+        self.assertEqual(busy_state({'updating': True}), 'updating')
+        self.assertIsNone(busy_state({'waiting_start': False, 'updating': False, 'importing': False}))
 
 
 class TestCraftyClient(unittest.IsolatedAsyncioTestCase):

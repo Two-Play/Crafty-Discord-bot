@@ -33,8 +33,9 @@ class TestServerCommands(unittest.IsolatedAsyncioTestCase):
         self.ctx = MagicMock()
         self.ctx.reply = AsyncMock()
 
-    def set_stats(self, running, online=0):
-        self.client.get_stats.return_value = {'running': running, 'online': online, 'world_name': 'World'}
+    def set_stats(self, running, online=0, **extra):
+        self.client.get_stats.return_value = {'running': running, 'online': online, 'world_name': 'World',
+                                              'int_ping_results': str(running), **extra}
 
     async def invoke(self, command, *args):
         await command.callback(self.cog, self.ctx, *args)
@@ -92,6 +93,18 @@ class TestServerCommands(unittest.IsolatedAsyncioTestCase):
         await self.invoke(self.cog.restart, SERVER_ID)
         self.client.run_action.assert_not_awaited()
         self.assertEqual(self.reply_text(), 'cannot restart server: 1 Player(s) online')
+
+    async def test_stop_with_unknown_player_count(self):
+        self.set_stats(running=True, int_ping_results='False')
+        with self.assertLogs('core.cogs.servers', level='WARNING'):
+            await self.invoke(self.cog.stop, SERVER_ID)
+        self.client.run_action.assert_awaited_once_with(SERVER_ID, ServerAction.STOP)
+
+    async def test_start_while_starting(self):
+        self.set_stats(running=False, waiting_start=True)
+        await self.invoke(self.cog.start, SERVER_ID)
+        self.client.run_action.assert_not_awaited()
+        self.assertEqual(self.reply_text(), 'Server is already starting')
 
     async def test_api_error_propagates(self):
         self.client.get_stats.side_effect = CraftyAPIError('down')

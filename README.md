@@ -194,7 +194,7 @@ fields.
 | `CRAFTY_TOKEN`                          | yes*     | Your Crafty Controller API token                                               |
 | `CRAFTY_USERNAME` / `CRAFTY_PASSWORD`   | yes*     | Crafty login, used instead of `CRAFTY_TOKEN` if no token is set (not recommended) |
 | `GUILD_ID`                              | no       | Discord server ID for the slash commands (without it they are synced globally) |
-| `ENABLE_AUTO_STOP_SERVER`               | no       | `true` to stop running servers without players automatically                   |
+| `ENABLE_AUTO_STOP_SERVER`               | no       | `true` to stop running servers without players automatically. Servers Crafty can't ping (unknown player count) or that are starting/updating are skipped |
 | `AUTO_STOP_SLEEP_TIME`                  | no       | Interval of the auto stop check in seconds (default `1800`)                    |
 | `CRAFTY_VERIFY_SSL`                     | no       | `true` to verify the TLS certificate of Crafty (default `false`, self-signed)  |
 | `LOG_LEVEL`                             | no       | `DEBUG`, `INFO` (default), `WARNING` or `ERROR` (libraries never log below `INFO`) |
