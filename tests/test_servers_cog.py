@@ -5,6 +5,7 @@ from discord.ext import commands
 
 from core.cogs.servers import ServerCommands, ServerId, select_backup
 from core.crafty import CraftyAPIError, ServerAction
+from core.flags import FeatureDisabled, FeatureFlags, flag_definitions
 
 SERVER_ID = 'ff231030-910c-4aaa-bd83-50e03aedab1c'
 
@@ -184,6 +185,24 @@ class TestSelectBackup(unittest.TestCase):
 
     def test_by_id(self):
         self.assertEqual(select_backup([{'backup_id': 'b1'}, {'backup_id': 'b2'}], 'B2'), {'backup_id': 'b2'})
+
+
+class TestServerCommandFlags(unittest.TestCase):
+
+    def test_disabled_command_fails_the_check(self):
+        flags = FeatureFlags(flag_definitions(), None)
+        cog = ServerCommands(MagicMock(), flags)
+        ctx = MagicMock()
+        ctx.command.name = 'stop'
+        self.assertTrue(cog.cog_check(ctx))
+        flags.set('command_stop', False)
+        with self.assertRaises(FeatureDisabled):
+            cog.cog_check(ctx)
+
+    def test_without_flags_everything_is_allowed(self):
+        ctx = MagicMock()
+        ctx.command.name = 'stop'
+        self.assertTrue(ServerCommands(MagicMock()).cog_check(ctx))
 
 
 if __name__ == '__main__':
