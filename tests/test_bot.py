@@ -1,3 +1,4 @@
+import socket
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -43,6 +44,18 @@ class TestCraftyBot(unittest.IsolatedAsyncioTestCase):
             dashboard.return_value = commands.Cog()
             await bot.setup_hook()
         dashboard.assert_called_once_with(bot)
+
+    async def test_setup_continues_when_dashboard_port_is_in_use(self):
+        with socket.socket() as blocker:
+            blocker.bind(('127.0.0.1', 0))
+            blocker.listen()
+            bot = self.make_bot(web_enabled=True, web_port=blocker.getsockname()[1])
+            with self.assertLogs('core.bot', level='ERROR') as logs:
+                await bot.setup_hook()
+        self.assertIn('already in use', logs.output[-1])
+        self.assertIn('keeps running without the dashboard', logs.output[-1])
+        self.assertIsNone(bot.get_cog('WebDashboard'))
+        self.assertIsNotNone(bot.get_cog('Servers'))
 
     async def test_setup_logs_in_without_token(self):
         bot = self.make_bot(crafty_token='', crafty_username='user', crafty_password='pw')

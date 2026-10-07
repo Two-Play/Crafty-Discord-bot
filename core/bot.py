@@ -18,7 +18,7 @@ from core.cogs.servers import ServerCommands
 from core.config import Settings
 from core.crafty import CraftyAPIError, CraftyClient
 from core.help_command import HelpCommand
-from core.web.dashboard import WebDashboard
+from core.web.dashboard import DashboardStartError, WebDashboard
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +77,11 @@ class CraftyBot(commands.Bot):
         else:
             logger.info('Auto stop disabled')
         if self.settings.web_enabled:
-            await self.add_cog(WebDashboard(self))
+            try:
+                await self.add_cog(WebDashboard(self))
+            except DashboardStartError as exc:
+                # The dashboard is optional, so the bot keeps running without it.
+                logger.error('%s. The bot keeps running without the dashboard.', exc)
 
         if self.guild is not None:
             self.tree.copy_global_to(guild=self.guild)
