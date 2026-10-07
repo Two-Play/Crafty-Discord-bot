@@ -67,7 +67,10 @@ async function refresh() {
   button.disabled = true;
   try {
     const response = await fetch('api/status', { cache: 'no-store' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || `HTTP ${response.status}`);
+    }
     render(await response.json());
   } catch (error) {
     $('error').hidden = false;
