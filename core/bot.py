@@ -18,6 +18,7 @@ from core.cogs.servers import ServerCommands
 from core.config import Settings
 from core.crafty import CraftyAPIError, CraftyClient
 from core.help_command import HelpCommand
+from core.web.dashboard import WebDashboard
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,8 @@ class CraftyBot(commands.Bot):
             logger.info('Auto stop enabled (every %d seconds)', self.settings.auto_stop_interval)
         else:
             logger.info('Auto stop disabled')
+        if self.settings.web_enabled:
+            await self.add_cog(WebDashboard(self))
 
         if self.guild is not None:
             self.tree.copy_global_to(guild=self.guild)

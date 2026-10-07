@@ -39,12 +39,14 @@ Discord API.
 - **Server Stop**: Stop the server
 - **Server Restart**: Restart the server
 - **Server List**: Get a list of all servers
+- **Server Backup**: Start a backup of a server (bot owner only)
+- **Auto complete (slash commands)**: Auto complete the server and the backup name
+- **Auto stop**: Stop servers without players automatically
+- **Web dashboard**: Read-only status page with the bot and server status
 
 ## Roadmap
 
-- **Server Backup**: Create a backup of the server
-- **Auto complete (slash commands)**: Auto complete the server ID
-- **Web UI**: Create a web interface for the bot
+- **Web dashboard controls**: Start, stop and back up servers from the dashboard
 
 ## Installation
 
@@ -71,6 +73,7 @@ server and obtain the user token. You can do this by following these steps:
     - COMMANDS
     - TERMINAL
     - PLAYERS
+    - BACKUP (only needed for the `backup` command)
 7. Enter a name for your user token (for example, "Crafty Bot Token")
 8. Click on "Create" to generate the user token
 9. Save your user token in a safe place (you will need it later)
@@ -140,6 +143,11 @@ services:
       - DISCORD_TOKEN=YOUR_DISCORD_TOKEN
       - CRAFTY_TOKEN=YOUR_CRAFT
       - SERVER_URL=YOUR_CRAFTY_SERVER_URL
+      # Optional web dashboard
+      # - WEB_ENABLED=true
+      # - WEB_PASSWORD=YOUR_DASHBOARD_PASSWORD
+    # ports:
+    #   - "8080:8080"
     restart: unless-stopped
 ```
 
@@ -198,6 +206,10 @@ fields.
 | `AUTO_STOP_SLEEP_TIME`                  | no       | Interval of the auto stop check in seconds (default `1800`)                    |
 | `CRAFTY_VERIFY_SSL`                     | no       | `true` to verify the TLS certificate of Crafty (default `false`, self-signed)  |
 | `LOG_LEVEL`                             | no       | `DEBUG`, `INFO` (default), `WARNING` or `ERROR` (libraries never log below `INFO`) |
+| `WEB_ENABLED`                           | no       | `true` to serve the read-only web dashboard                                    |
+| `WEB_HOST`                              | no       | Interface the dashboard listens on (default `127.0.0.1`, `0.0.0.0` in Docker)  |
+| `WEB_PORT`                              | no       | Port of the dashboard (default `8080`)                                         |
+| `WEB_PASSWORD`                          | no       | Password for the dashboard (HTTP basic auth, any user name). Strongly recommended if it is reachable from other machines |
 | `LOG_FILE`                              | no       | Also write the log to this file, e.g. `logs/bot.log` (rotated at 5 MB, 3 backups) |
 
 \* Either `CRAFTY_TOKEN` or `CRAFTY_USERNAME` and `CRAFTY_PASSWORD` must be set.
@@ -269,6 +281,25 @@ For example:
 ```bash
   >start da459ce3-6964-46b8-bb21-1c3e753b6ba9
 ```
+
+To start a backup of a server (bot owner only), enter the following command:
+
+```bash
+  >backup [server_id] [backup_name]
+```
+
+Without `[backup_name]` the default backup configuration of the server is used. The backups have to be configured in
+Crafty first, and the Crafty API token needs the `BACKUP` permission.
+
+### Web dashboard
+
+Set `WEB_ENABLED=true` to get a read-only status page at `http://HOST:8080` (bot connection, latency, uptime and the
+status, players, CPU and RAM of every server). It refreshes every 30 seconds. `/api/status` returns the same data as
+JSON and `/healthz` can be used for health checks (no password needed).
+
+> [!WARNING]
+> Set `WEB_PASSWORD` if the dashboard can be reached from other machines. Use a reverse proxy with HTTPS if you
+> expose it to the internet, because basic auth sends the password unencrypted otherwise.
 
 ## Issues
 

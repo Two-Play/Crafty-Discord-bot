@@ -133,5 +133,39 @@ class TestCraftyClient(unittest.IsolatedAsyncioTestCase):
         self.assertIn('GET /api/v2/servers -> HTTP', logs.output[0])
 
 
+class TestCraftyClientBackups(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self):
+        self.session = MagicMock()
+        self.session.headers = {}
+        self.client = CraftyClient('https://crafty.local', 'token', session=self.session)
+
+    async def test_list_backups_without_envelope(self):
+        # Crafty 4.11 returns the backups as a dict keyed by ID, without {"status", "data"}
+        self.session.request.return_value = make_response(body={
+            'b1': {'backup_id': 'b1', 'backup_name': 'Default', 'default': True},
+            'b2': {'backup_id': 'b2', 'backup_name': 'Weekly', 'default': False},
+        })
+        backups = await self.client.list_backups(SERVER_ID)
+        self.assertEqual([backup['backup_id'] for backup in backups], ['b1', 'b2'])
+        self.assertEqual(self.session.request.call_args.args,
+                         ('GET', f'https://crafty.local/api/v2/servers/{SERVER_ID}/backups'))
+
+    async def test_list_backups_with_envelope(self):
+        self.session.request.return_value = make_response(body={'status': 'ok', 'data': [{'backup_id': 'b1'}]})
+        self.assertEqual(await self.client.list_backups(SERVER_ID), [{'backup_id': 'b1'}])
+
+    async def test_list_backups_not_authorized(self):
+        self.session.request.return_value = make_response(400, {'status': 'error', 'error': 'NOT_AUTHORIZED'})
+        with self.assertRaises(CraftyAPIError):
+            await self.client.list_backups(SERVER_ID)
+
+    async def test_run_backup(self):
+        self.session.request.return_value = make_response(body={'status': 'ok'})
+        await self.client.run_backup(SERVER_ID, 'b1')
+        self.assertEqual(self.session.request.call_args.args,
+                         ('POST', f'https://crafty.local/api/v2/servers/{SERVER_ID}/action/backup_server/b1'))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -11,6 +11,8 @@ from typing import Mapping, Optional
 
 DEFAULT_AUTO_STOP_INTERVAL = 1800  # seconds (30 minutes)
 DEFAULT_LOG_LEVEL = 'INFO'
+DEFAULT_WEB_HOST = '127.0.0.1'
+DEFAULT_WEB_PORT = 8080
 
 _TRUE_VALUES = {'1', 'true', 'yes', 'on'}
 
@@ -61,6 +63,10 @@ class Settings:  # pylint: disable=too-many-instance-attributes
     verify_ssl: bool = False
     log_level: str = DEFAULT_LOG_LEVEL
     log_file: Optional[str] = None
+    web_enabled: bool = False
+    web_host: str = DEFAULT_WEB_HOST
+    web_port: int = DEFAULT_WEB_PORT
+    web_password: str = field(default='', repr=False)
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> Settings:
@@ -93,6 +99,10 @@ class Settings:  # pylint: disable=too-many-instance-attributes
         if not isinstance(logging.getLevelName(log_level), int):
             raise ConfigError(f'LOG_LEVEL {log_level!r} is not a valid log level')
 
+        web_port = _get_int(env, 'WEB_PORT', DEFAULT_WEB_PORT)
+        if not 0 < web_port < 65536:
+            raise ConfigError('WEB_PORT must be between 1 and 65535')
+
         return cls(
             server_url=_get(env, 'SERVER_URL').rstrip('/'),
             discord_token=_get(env, 'DISCORD_TOKEN'),
@@ -105,4 +115,8 @@ class Settings:  # pylint: disable=too-many-instance-attributes
             verify_ssl=_get_bool(env, 'CRAFTY_VERIFY_SSL'),
             log_level=log_level,
             log_file=_get(env, 'LOG_FILE') or None,
+            web_enabled=_get_bool(env, 'WEB_ENABLED'),
+            web_host=_get(env, 'WEB_HOST') or DEFAULT_WEB_HOST,
+            web_port=web_port,
+            web_password=_get(env, 'WEB_PASSWORD'),
         )

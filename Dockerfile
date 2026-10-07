@@ -2,7 +2,11 @@ FROM python:3.12-slim
 LABEL authors="Philippe Westenfelder"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    WEB_HOST=0.0.0.0
+
+# Web dashboard (only served when WEB_ENABLED=true)
+EXPOSE 8080
 
 WORKDIR /usr/src/app
 

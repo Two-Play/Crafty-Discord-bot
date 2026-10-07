@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crafty Bot</title>
+  <link rel="stylesheet" href="app.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>Crafty Bot</h1>
+      <p class="muted" id="updated">Loading…</p>
+    </div>
+    <button type="button" id="refresh">Refresh</button>
+  </header>
+
+  <main>
+    <section class="bot" aria-label="Bot status">
+      <div class="stat"><span class="label">Discord</span><span class="value" id="bot-connected">–</span></div>
+      <div class="stat"><span class="label">Bot user</span><span class="value" id="bot-user">–</span></div>
+      <div class="stat"><span class="label">Latency</span><span class="value" id="bot-latency">–</span></div>
+      <div class="stat"><span class="label">Guilds</span><span class="value" id="bot-guilds">–</span></div>
+      <div class="stat"><span class="label">Uptime</span><span class="value" id="bot-uptime">–</span></div>
+      <div class="stat"><span class="label">Auto stop</span><span class="value" id="bot-autostop">–</span></div>
+    </section>
+
+    <p class="alert" id="error" hidden></p>
+
+    <h2>Servers</h2>
+    <section class="servers" id="servers" aria-live="polite"></section>
+    <p class="muted" id="empty" hidden>No servers visible to the Crafty API user.</p>
+  </main>
+
+  <footer class="muted">Crafty Bot <span id="version"></span> · refreshes every 30 seconds</footer>
+
+  <template id="server-template">
+    <article class="server">
+      <header>
+        <h3 class="name"></h3>
+        <span class="badge"></span>
+      </header>
+      <dl>
+        <div><dt>Players</dt><dd class="players"></dd></div>
+        <div><dt>Version</dt><dd class="version"></dd></div>
+        <div><dt>CPU</dt><dd class="cpu"></dd></div>
+        <div><dt>RAM</dt><dd class="memory"></dd></div>
+        <div><dt>Address</dt><dd class="address"></dd></div>
+        <div><dt>ID</dt><dd class="id"></dd></div>
+      </dl>
+      <p class="player-names muted"></p>
+    </article>
+  </template>
+</body>
+</html>
