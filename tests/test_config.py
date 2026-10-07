@@ -19,6 +19,7 @@ class TestSettingsFromEnv(unittest.TestCase):
         self.assertFalse(settings.verify_ssl)
         self.assertEqual(settings.log_level, 'INFO')
         self.assertIsNone(settings.log_file)
+        self.assertEqual(settings.flags_file, 'data/feature_flags.json')
 
     def test_optional_vars(self):
         settings = Settings.from_env({**REQUIRED, 'GUILD_ID': '42', 'ENABLE_AUTO_STOP_SERVER': 'true',

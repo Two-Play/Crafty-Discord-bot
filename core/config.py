@@ -13,6 +13,7 @@ DEFAULT_AUTO_STOP_INTERVAL = 1800  # seconds (30 minutes)
 DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_WEB_HOST = '127.0.0.1'
 DEFAULT_WEB_PORT = 8080
+DEFAULT_FLAGS_FILE = 'data/feature_flags.json'
 
 _TRUE_VALUES = {'1', 'true', 'yes', 'on'}
 
@@ -67,6 +68,7 @@ class Settings:  # pylint: disable=too-many-instance-attributes
     web_host: str = DEFAULT_WEB_HOST
     web_port: int = DEFAULT_WEB_PORT
     web_password: str = field(default='', repr=False)
+    flags_file: str = DEFAULT_FLAGS_FILE
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> Settings:
@@ -119,4 +121,5 @@ class Settings:  # pylint: disable=too-many-instance-attributes
             web_host=_get(env, 'WEB_HOST') or DEFAULT_WEB_HOST,
             web_port=web_port,
             web_password=_get(env, 'WEB_PASSWORD'),
+            flags_file=_get(env, 'FLAGS_FILE') or DEFAULT_FLAGS_FILE,
         )

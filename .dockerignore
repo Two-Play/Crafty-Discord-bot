@@ -9,3 +9,4 @@ htmlcov
 .coverage
 coverage.xml
 tests
+data

@@ -1,6 +1,7 @@
 """
-Read-only web dashboard. Serves a status page and a JSON endpoint with the state of the
-bot and of every Crafty server. Only loaded when ``WEB_ENABLED=true``.
+Web dashboard. Serves a status page and a JSON endpoint with the state of the bot and of
+every Crafty server, and lets the feature flags be switched (only with ``WEB_PASSWORD``).
+Only loaded when ``WEB_ENABLED=true``.
 """
 
 from __future__ import annotations
@@ -23,6 +24,7 @@ from discord.ext import commands
 
 from core import __version__
 from core.crafty import CraftyAPIError, JsonDict, busy_state, player_count, player_names
+from core.flags import FlagError, FlagSaveError
 from core.formatting import format_memory
 
 if TYPE_CHECKING:
@@ -37,6 +39,9 @@ STATIC_FILES = {
     '/app.js': ('app.js', 'text/javascript'),
     '/app.css': ('app.css', 'text/css'),
 }
+# Sent by app.js on every write. Browsers only allow custom headers on cross-origin requests after a
+# CORS preflight, which this server never answers, so other sites can't change flags (CSRF).
+CSRF_HEADER = 'X-Crafty-Bot'
 SECURITY_HEADERS = {
     'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
                                "img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
@@ -104,6 +109,8 @@ class WebDashboard(commands.Cog):
         app = web.Application(middlewares=[self._security_middleware])
         app.router.add_get('/healthz', self._health)
         app.router.add_get('/api/status', self._status)
+        app.router.add_get('/api/flags', self._get_flags)
+        app.router.add_put('/api/flags/{name}', self._set_flag)
         for path, (file_name, content_type) in STATIC_FILES.items():
             app.router.add_get(path, self._static_handler(file_name, content_type))
         return app
@@ -184,6 +191,43 @@ class WebDashboard(commands.Cog):
             logger.exception('Unexpected error while collecting the dashboard status')
             return web.json_response({'error': 'Internal error, check the bot logs.'}, status=500)
 
+    @property
+    def flags_editable(self) -> bool:
+        """Flags can only be changed when the dashboard is protected by a password."""
+        return bool(self.bot.settings.web_password)
+
+    def _flags_response(self) -> web.Response:
+        return web.json_response({'flags': self.bot.flags.as_list(), 'editable': self.flags_editable})
+
+    async def _get_flags(self, _request: web.Request) -> web.StreamResponse:
+        return self._flags_response()
+
+    async def _set_flag(self, request: web.Request) -> web.StreamResponse:
+        if not self.flags_editable:
+            return web.json_response({'error': 'Set WEB_PASSWORD to change feature flags.'}, status=403)
+        if request.headers.get(CSRF_HEADER) != '1' or request.content_type != 'application/json':
+            logger.warning('Rejected feature flag change without CSRF header from %s', request.remote)
+            return web.json_response({'error': 'Invalid request.'}, status=400)
+        try:
+            body = await request.json()
+        except ValueError:
+            return web.json_response({'error': 'Invalid JSON.'}, status=400)
+
+        name = request.match_info['name']
+        enabled = body.get('enabled') if isinstance(body, dict) else None
+        try:
+            self.bot.flags.set(name, enabled)
+        except FlagSaveError as exc:
+            logger.error('%s', exc)
+            return web.json_response({'error': 'The flag could not be saved, check the bot logs.'}, status=500)
+        except FlagError as exc:
+            logger.warning('Feature flag change from %s failed: %s', request.remote, exc)
+            return web.json_response({'error': str(exc)}, status=400)
+        logger.info('Feature flag %s %s from the dashboard (%s)', name, 'enabled' if enabled else 'disabled',
+                    request.remote)
+        self._snapshot = None  # the bot status shows the auto stop flag
+        return self._flags_response()
+
     async def snapshot(self) -> Dict[str, Any]:
         """Return the current status, cached for a few seconds."""
         async with self._snapshot_lock:
@@ -233,5 +277,5 @@ class WebDashboard(commands.Cog):
             'latency_ms': round(latency * 1000) if math.isfinite(latency) else None,
             'guilds': len(self.bot.guilds),
             'uptime_seconds': round(time.monotonic() - self._started),
-            'auto_stop': settings.auto_stop_interval if settings.auto_stop_enabled else None,
+            'auto_stop': settings.auto_stop_interval if self.bot.flags.is_enabled('auto_stop') else None,
         }
