@@ -12,9 +12,11 @@ class TestAutoStop(unittest.IsolatedAsyncioTestCase):
         self.client.list_servers = AsyncMock(return_value=[{'server_id': 'idle'}, {'server_id': 'busy'},
                                                            {'server_id': 'off'}])
         self.client.get_stats = AsyncMock(side_effect=lambda server_id: {
-            'idle': {'running': True, 'online': 0},
-            'busy': {'running': True, 'online': 3},
-            'off': {'running': False, 'online': 0},
+            'idle': {'running': True, 'online': 0, 'int_ping_results': 'True'},
+            'busy': {'running': True, 'online': 3, 'int_ping_results': 'True'},
+            'off': {'running': False, 'online': 0, 'int_ping_results': 'False'},
+            'unpingable': {'running': True, 'online': 0, 'int_ping_results': 'False'},
+            'starting': {'running': True, 'online': 0, 'int_ping_results': 'True', 'waiting_start': True},
         }[server_id])
         self.client.run_action = AsyncMock()
         self.cog = AutoStop(self.client, interval=60)
@@ -26,6 +28,12 @@ class TestAutoStop(unittest.IsolatedAsyncioTestCase):
         with self.assertLogs('core.cogs.auto_stop', level='INFO'):
             await self.cog.stop_idle_servers.coro(self.cog)
         self.client.run_action.assert_awaited_once_with('idle', ServerAction.STOP)
+
+    async def test_skips_servers_with_unknown_player_count_or_busy(self):
+        self.client.list_servers.return_value = [{'server_id': 'unpingable'}, {'server_id': 'starting'}]
+        with self.assertLogs('core.cogs.auto_stop', level='INFO'):
+            await self.cog.stop_idle_servers.coro(self.cog)
+        self.client.run_action.assert_not_awaited()
 
     async def test_list_error_is_handled(self):
         self.client.list_servers.side_effect = CraftyAPIError('down')
