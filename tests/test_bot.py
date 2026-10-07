@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from discord.ext import commands
 
@@ -36,6 +36,13 @@ class TestCraftyBot(unittest.IsolatedAsyncioTestCase):
         self.assertIsNotNone(bot.get_cog('Admin'))
         self.assertIsNone(bot.get_cog('AutoStop'))
         self.crafty.login.assert_not_awaited()
+
+    async def test_setup_loads_dashboard_when_enabled(self):
+        bot = self.make_bot(web_enabled=True)
+        with patch('core.bot.WebDashboard') as dashboard:
+            dashboard.return_value = commands.Cog()
+            await bot.setup_hook()
+        dashboard.assert_called_once_with(bot)
 
     async def test_setup_logs_in_without_token(self):
         bot = self.make_bot(crafty_token='', crafty_username='user', crafty_password='pw')

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import List
+from typing import List, Optional
 
 from discord import Interaction, app_commands
 from discord.ext import commands
@@ -29,6 +29,23 @@ class ServerId(commands.Converter):
         if server_id is None:
             raise commands.BadArgument('Invalid server ID. Use `>list` to get the server IDs.')
         return server_id
+
+
+def select_backup(backups: List[JsonDict], name: Optional[str]) -> Optional[JsonDict]:
+    """
+    Pick the backup configuration by name or ID. Without a name, pick the default
+    configuration, or the only one if there is just one.
+    """
+    if name:
+        wanted = name.strip().lower()
+        for backup in backups:
+            if wanted in (str(backup.get('backup_name', '')).lower(), str(backup.get('backup_id', '')).lower()):
+                return backup
+        return None
+    for backup in backups:
+        if backup.get('default'):
+            return backup
+    return backups[0] if len(backups) == 1 else None
 
 
 class ServerCommands(commands.Cog, name='Servers'):
@@ -68,6 +85,23 @@ class ServerCommands(commands.Cog, name='Servers'):
             if str(server.get('server_name', '')).lower().startswith(current)
         ]
         return choices[:MAX_AUTOCOMPLETE_CHOICES]
+
+    async def backup_autocomplete(self, interaction: Interaction,
+                                  current: str) -> List[app_commands.Choice[str]]:
+        """Suggest the backup configurations of the server selected in the same command."""
+        server_id = parse_server_id(str(getattr(interaction.namespace, 'server_id', '') or ''))
+        if server_id is None:
+            return []
+        try:
+            backups = await self._client.list_backups(server_id)
+        except CraftyAPIError as exc:
+            logger.warning('Autocomplete could not load the backups of server %s: %s', server_id, exc)
+            return []
+
+        current = current.lower()
+        names = [str(backup.get('backup_name') or backup['backup_id']) for backup in backups]
+        return [app_commands.Choice(name=name, value=name)
+                for name in names if name.lower().startswith(current)][:MAX_AUTOCOMPLETE_CHOICES]
 
     async def _ensure_stoppable(self, ctx: commands.Context, server_id: str, verb: str) -> bool:
         """Reply and return False if the server is not running or players are online."""
@@ -137,3 +171,26 @@ class ServerCommands(commands.Cog, name='Servers'):
         await self._client.run_action(server_id, ServerAction.RESTART)
         logger.info('Server %s restarted by %s (%s)', server_id, ctx.author, ctx.author.id)
         await ctx.reply('Server restarted')
+
+    @commands.hybrid_command(name='backup', description='create a backup of a server (owner only)')
+    @commands.is_owner()
+    @app_commands.autocomplete(server_id=server_autocomplete, backup=backup_autocomplete)
+    async def backup(self, ctx: commands.Context, server_id: ServerId, *, backup: Optional[str] = None) -> None:
+        """Start a backup of a server. Without a backup name the default backup configuration is used."""
+        backups = await self._client.list_backups(server_id)
+        if not backups:
+            await ctx.reply('No backup configured for this server. Create one in Crafty first.')
+            return
+
+        selected = select_backup(backups, backup)
+        if selected is None:
+            names = ', '.join(f"`{entry.get('backup_name') or entry['backup_id']}`" for entry in backups)
+            prefix = f'Backup `{backup}` not found' if backup else 'No default backup configured'
+            await ctx.reply(f'{prefix}. Available backups: {names}')
+            return
+
+        name = selected.get('backup_name') or selected['backup_id']
+        await self._client.run_backup(server_id, selected['backup_id'])
+        logger.info('Backup %s (%s) of server %s started by %s (%s)', name, selected['backup_id'], server_id,
+                    ctx.author, ctx.author.id)
+        await ctx.reply(f'Backup `{name}` started. Crafty runs it in the background.')
