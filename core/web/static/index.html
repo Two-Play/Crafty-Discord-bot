@@ -36,9 +36,30 @@
     <p class="muted hint" id="flags-hint" hidden>Set <code>WEB_PASSWORD</code> to change the feature flags here.</p>
     <p class="alert" id="flags-error" hidden></p>
     <section class="flags" id="flags"></section>
+
+    <h2>Logs</h2>
+    <div class="log-controls">
+      <label>Log level
+        <select id="log-level" disabled></select>
+      </label>
+      <label>Show
+        <select id="log-filter">
+          <option value="DEBUG">All</option>
+          <option value="INFO">Info and above</option>
+          <option value="WARNING">Warnings and errors</option>
+          <option value="ERROR">Errors only</option>
+        </select>
+      </label>
+      <label class="log-search">Search
+        <input type="search" id="log-search" placeholder="Text or logger">
+      </label>
+    </div>
+    <p class="muted hint" id="log-level-hint">Loading…</p>
+    <p class="alert" id="logs-error" hidden></p>
+    <div class="logs" id="logs" role="log" aria-live="off" tabindex="0"></div>
   </main>
 
-  <footer class="muted">Crafty Bot <span id="version"></span> · refreshes every 30 seconds</footer>
+  <footer class="muted">Crafty Bot <span id="version"></span> · status refreshes every 30 seconds, logs every 5 seconds</footer>
 
   <template id="flag-template">
     <label class="flag">

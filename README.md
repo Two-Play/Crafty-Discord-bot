@@ -44,6 +44,7 @@ Discord API.
 - **Auto stop**: Stop servers without players automatically
 - **Web dashboard**: Status page with the bot and server status
 - **Feature flags**: Switch commands and auto stop on and off in the web dashboard
+- **Logs in the dashboard**: View the bot logs and change the log level at runtime
 
 ## Roadmap
 
@@ -304,6 +305,13 @@ Crafty first, and the Crafty API token needs the `BACKUP` permission.
 Set `WEB_ENABLED=true` to get a status page at `http://HOST:8080` (bot connection, latency, uptime and the
 status, players, CPU and RAM of every server). It refreshes every 30 seconds. `/api/status` returns the same data as
 JSON and `/healthz` can be used for health checks (no password needed).
+
+#### Logs
+
+The dashboard shows the most recent log entries of the bot (the last 1000 are kept in memory) and refreshes them every
+5 seconds. They can be filtered by level and searched. With `WEB_PASSWORD` set, the log level can be changed there as
+well, for example to `DEBUG` while looking into a problem. The change lasts until the bot restarts, then `LOG_LEVEL`
+applies again. Libraries such as discord.py never log below `INFO`.
 
 #### Feature flags
 

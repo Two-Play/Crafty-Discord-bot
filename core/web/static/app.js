@@ -135,7 +135,111 @@ async function loadFlags() {
   }
 }
 
-$('refresh').addEventListener('click', () => { refresh(); loadFlags(); });
+const LOG_REFRESH_MS = 5000;
+const MAX_LOG_ENTRIES = 1000;
+const LEVEL_ORDER = { DEBUG: 10, INFO: 20, WARNING: 30, ERROR: 40, CRITICAL: 50 };
+const logState = { entries: [], lastId: 0, level: null };
+
+function showLogsError(message) {
+  $('logs-error').hidden = !message;
+  $('logs-error').textContent = message || '';
+}
+
+function logEntryNode(entry) {
+  const row = document.createElement('div');
+  row.className = `log-entry ${entry.level}`;
+  const cell = (className, text) => {
+    const span = document.createElement('span');
+    span.className = className;
+    span.textContent = text;
+    row.append(span);
+  };
+  cell('log-time', new Date(entry.time).toLocaleTimeString());
+  cell('log-level', entry.level);
+  cell('log-logger', entry.logger);
+  row.lastChild.title = entry.logger;
+  cell('log-message', entry.message);
+  return row;
+}
+
+function renderLogs() {
+  const box = $('logs');
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  const minLevel = LEVEL_ORDER[$('log-filter').value];
+  const search = $('log-search').value.trim().toLowerCase();
+  const visible = logState.entries.filter((entry) => (LEVEL_ORDER[entry.level] || 0) >= minLevel
+    && (!search || entry.message.toLowerCase().includes(search) || entry.logger.toLowerCase().includes(search)));
+
+  if (visible.length) {
+    box.replaceChildren(...visible.map(logEntryNode));
+  } else {
+    const empty = document.createElement('p');
+    empty.className = 'logs-empty';
+    empty.textContent = logState.entries.length ? 'No log entries match the filter.' : 'No log entries yet.';
+    box.replaceChildren(empty);
+  }
+  if (atBottom) box.scrollTop = box.scrollHeight;
+}
+
+function renderLogLevel(data) {
+  const select = $('log-level');
+  if (!select.options.length) {
+    select.replaceChildren(...data.levels.map((level) => new Option(level, level)));
+  }
+  if (document.activeElement !== select) select.value = data.level;
+  select.disabled = !data.editable;
+  logState.level = data.level;
+  $('log-level-hint').textContent = data.editable
+    ? 'Changing the log level lasts until the bot restarts, then LOG_LEVEL applies again. Libraries never log below INFO.'
+    : 'Set WEB_PASSWORD to change the log level here.';
+}
+
+async function loadLogs() {
+  try {
+    const response = await fetch(api(`api/logs?after=${logState.lastId}`), { cache: 'no-store' });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+    showLogsError(null);
+    renderLogLevel(body);
+    if (body.entries.length || !logState.lastId) {
+      logState.entries = logState.entries.concat(body.entries).slice(-MAX_LOG_ENTRIES);
+      logState.lastId = body.entries.length ? body.entries[body.entries.length - 1].id : logState.lastId;
+      renderLogs();
+    }
+  } catch (error) {
+    showLogsError(`Could not load the logs: ${error.message}`);
+  }
+}
+
+async function setLogLevel(level) {
+  const select = $('log-level');
+  select.disabled = true;
+  try {
+    const response = await fetch(api('api/log-level'), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Crafty-Bot': '1' },
+      body: JSON.stringify({ level }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+    showLogsError(null);
+    logState.level = body.level;
+    loadLogs();
+  } catch (error) {
+    select.value = logState.level;
+    showLogsError(`Could not change the log level: ${error.message}`);
+  } finally {
+    select.disabled = false;
+  }
+}
+
+$('log-level').addEventListener('change', (event) => setLogLevel(event.target.value));
+$('log-filter').addEventListener('change', renderLogs);
+$('log-search').addEventListener('input', renderLogs);
+
+$('refresh').addEventListener('click', () => { refresh(); loadFlags(); loadLogs(); });
 refresh();
 loadFlags();
+loadLogs();
+setInterval(loadLogs, LOG_REFRESH_MS);
 setInterval(refresh, REFRESH_MS);
