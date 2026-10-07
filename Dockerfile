@@ -1,15 +1,26 @@
 FROM python:3.12-slim
 LABEL authors="Philippe Westenfelder"
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    WEB_HOST=0.0.0.0
+
+# Web dashboard (only served when WEB_ENABLED=true)
+EXPOSE 8080
+
 WORKDIR /usr/src/app
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY core ./core
 
-ENV PYTHONWARNINGS="ignore:Unverified HTTPS request"
+RUN useradd --create-home --uid 1000 bot \
+    && mkdir data \
+    && chown bot:bot data
+USER bot
 
-CMD [ "python", "./core/main.py" ]
+# Feature flags changed in the web dashboard are saved here
+VOLUME ["/usr/src/app/data"]
 
-#ENTRYPOINT ["top", "-b"]
+CMD ["python", "-m", "core"]
