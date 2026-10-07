@@ -3,7 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from discord.ext import commands
 
-from core.cogs.servers import ServerCommands, ServerId
+from core.cogs.servers import ServerCommands, ServerId, select_backup
 from core.crafty import CraftyAPIError, ServerAction
 
 SERVER_ID = 'ff231030-910c-4aaa-bd83-50e03aedab1c'
@@ -37,8 +37,8 @@ class TestServerCommands(unittest.IsolatedAsyncioTestCase):
         self.client.get_stats.return_value = {'running': running, 'online': online, 'world_name': 'World',
                                               'int_ping_results': str(running), **extra}
 
-    async def invoke(self, command, *args):
-        await command.callback(self.cog, self.ctx, *args)
+    async def invoke(self, command, *args, **kwargs):
+        await command.callback(self.cog, self.ctx, *args, **kwargs)
 
     def reply_text(self):
         return self.ctx.reply.call_args.args[0]
@@ -124,6 +124,66 @@ class TestServerCommands(unittest.IsolatedAsyncioTestCase):
         self.client.list_servers.side_effect = CraftyAPIError('down')
         with self.assertLogs('core.cogs.servers', level='WARNING'):
             self.assertEqual(await self.cog.server_autocomplete(MagicMock(), ''), [])
+
+    def set_backups(self, *backups):
+        self.client.list_backups = AsyncMock(return_value=list(backups))
+        self.client.run_backup = AsyncMock()
+
+    async def test_backup_default(self):
+        self.set_backups({'backup_id': 'b1', 'backup_name': 'Weekly'},
+                         {'backup_id': 'b2', 'backup_name': 'Default', 'default': True})
+        with self.assertLogs('core.cogs.servers', level='INFO'):
+            await self.invoke(self.cog.backup, SERVER_ID)
+        self.client.run_backup.assert_awaited_once_with(SERVER_ID, 'b2')
+        self.assertIn('`Default` started', self.reply_text())
+
+    async def test_backup_by_name(self):
+        self.set_backups({'backup_id': 'b1', 'backup_name': 'Weekly'},
+                         {'backup_id': 'b2', 'backup_name': 'Default', 'default': True})
+        with self.assertLogs('core.cogs.servers', level='INFO'):
+            await self.invoke(self.cog.backup, SERVER_ID, backup='weekly')
+        self.client.run_backup.assert_awaited_once_with(SERVER_ID, 'b1')
+
+    async def test_backup_unknown_name(self):
+        self.set_backups({'backup_id': 'b1', 'backup_name': 'Weekly'})
+        await self.invoke(self.cog.backup, SERVER_ID, backup='daily')
+        self.client.run_backup.assert_not_awaited()
+        self.assertIn('`Weekly`', self.reply_text())
+
+    async def test_backup_none_configured(self):
+        self.set_backups()
+        await self.invoke(self.cog.backup, SERVER_ID)
+        self.client.run_backup.assert_not_awaited()
+        self.assertIn('No backup configured', self.reply_text())
+
+    async def test_backup_is_owner_only(self):
+        self.assertTrue(self.cog.backup.checks)
+
+    async def test_backup_autocomplete(self):
+        self.set_backups({'backup_id': 'b1', 'backup_name': 'Weekly'}, {'backup_id': 'b2', 'backup_name': 'Daily'})
+        interaction = MagicMock()
+        interaction.namespace.server_id = SERVER_ID
+        choices = await self.cog.backup_autocomplete(interaction, 'we')
+        self.assertEqual([c.value for c in choices], ['Weekly'])
+
+    async def test_backup_autocomplete_without_server(self):
+        self.set_backups({'backup_id': 'b1'})
+        interaction = MagicMock()
+        interaction.namespace.server_id = None
+        self.assertEqual(await self.cog.backup_autocomplete(interaction, ''), [])
+        self.client.list_backups.assert_not_awaited()
+
+
+class TestSelectBackup(unittest.TestCase):
+
+    def test_single_backup_is_used_without_default(self):
+        self.assertEqual(select_backup([{'backup_id': 'b1'}], None), {'backup_id': 'b1'})
+
+    def test_no_default_among_several(self):
+        self.assertIsNone(select_backup([{'backup_id': 'b1'}, {'backup_id': 'b2'}], None))
+
+    def test_by_id(self):
+        self.assertEqual(select_backup([{'backup_id': 'b1'}, {'backup_id': 'b2'}], 'B2'), {'backup_id': 'b2'})
 
 
 if __name__ == '__main__':

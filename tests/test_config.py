@@ -63,14 +63,24 @@ class TestSettingsFromEnv(unittest.TestCase):
 
     def test_invalid_values(self):
         for name, value in (('GUILD_ID', 'abc'), ('AUTO_STOP_SLEEP_TIME', '0'),
-                            ('AUTO_STOP_SLEEP_TIME', 'x'), ('LOG_LEVEL', 'LOUD')):
+                            ('AUTO_STOP_SLEEP_TIME', 'x'), ('LOG_LEVEL', 'LOUD'), ('WEB_PORT', '0'),
+                            ('WEB_PORT', '70000')):
             with self.subTest(name=name, value=value), self.assertRaises(ConfigError):
                 Settings.from_env({**REQUIRED, name: value})
 
     def test_secrets_not_in_repr(self):
-        text = repr(Settings.from_env({**REQUIRED, 'CRAFTY_PASSWORD': 'pw-secret'}))
-        for secret in ('discord-secret', 'crafty-secret', 'pw-secret'):
+        text = repr(Settings.from_env({**REQUIRED, 'CRAFTY_PASSWORD': 'pw-secret', 'WEB_PASSWORD': 'web-secret'}))
+        for secret in ('discord-secret', 'crafty-secret', 'pw-secret', 'web-secret'):
             self.assertNotIn(secret, text)
+
+    def test_web_settings(self):
+        defaults = Settings.from_env(REQUIRED)
+        self.assertFalse(defaults.web_enabled)
+        self.assertEqual((defaults.web_host, defaults.web_port, defaults.web_password), ('127.0.0.1', 8080, ''))
+        settings = Settings.from_env({**REQUIRED, 'WEB_ENABLED': 'true', 'WEB_HOST': '0.0.0.0', 'WEB_PORT': '9000',
+                                      'WEB_PASSWORD': 'pw'})
+        self.assertTrue(settings.web_enabled)
+        self.assertEqual((settings.web_host, settings.web_port, settings.web_password), ('0.0.0.0', 9000, 'pw'))
 
 
 if __name__ == '__main__':

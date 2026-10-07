@@ -35,6 +35,7 @@ class ServerAction(str, Enum):
     START = 'start_server'
     STOP = 'stop_server'
     RESTART = 'restart_server'
+    BACKUP = 'backup_server'
 
 
 def parse_server_id(value: str) -> Optional[str]:
@@ -142,6 +143,23 @@ class CraftyClient:
                                  f'{_shorten(repr(body), MAX_LOGGED_BODY_LENGTH)}')
         return body
 
+    def _request_raw(self, method: str, path: str) -> Any:
+        """Like ``_request`` for endpoints that answer without the ``{"status", "data"}`` envelope."""
+        try:
+            response = self._session.request(method, self._base_url + path, timeout=self._timeout,
+                                             verify=self._verify_ssl)
+        except requests.RequestException as exc:
+            raise CraftyAPIError(f'{method} {path} failed: {exc}') from exc
+        logger.debug('%s %s -> HTTP %d', method, path, response.status_code)
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise CraftyAPIError(f'{method} {path} returned invalid JSON') from exc
+        if not response.ok or (isinstance(body, dict) and body.get('status') == 'error'):
+            raise CraftyAPIError(f'{method} {path} returned HTTP {response.status_code}: '
+                                 f'{_shorten(repr(body), MAX_LOGGED_BODY_LENGTH)}')
+        return body
+
     async def _call(self, method: str, path: str, payload: Optional[JsonDict] = None) -> JsonDict:
         return await asyncio.to_thread(self._request, method, path, payload)
 
@@ -163,6 +181,29 @@ class CraftyClient:
         """Return the current statistics (running state, players, CPU, RAM...) of a server."""
         return (await self._call('GET', f'{SERVERS_ENDPOINT}/{server_id}/stats'))['data']
 
-    async def run_action(self, server_id: str, action: ServerAction) -> None:
-        """Execute a power action (start, stop, restart) on a server."""
-        await self._call('POST', f'{SERVERS_ENDPOINT}/{server_id}/action/{action.value}')
+    async def run_action(self, server_id: str, action: ServerAction, action_id: Optional[str] = None) -> None:
+        """Execute an action (start, stop, restart, backup) on a server."""
+        path = f'{SERVERS_ENDPOINT}/{server_id}/action/{action.value}'
+        if action_id:
+            path += f'/{action_id}'
+        await self._call('POST', path)
+
+    async def list_backups(self, server_id: str) -> List[JsonDict]:
+        """
+        Return the backup configurations of a server.
+
+        Needs the BACKUP permission. Crafty returns them as a dict keyed by backup ID and,
+        unlike the other endpoints, without the ``{"status", "data"}`` envelope.
+        """
+        body = await asyncio.to_thread(self._request_raw, 'GET', f'{SERVERS_ENDPOINT}/{server_id}/backups')
+        if isinstance(body, dict) and body.get('status') == 'ok':
+            body = body.get('data')
+        if isinstance(body, dict):
+            body = list(body.values())
+        if not isinstance(body, list):
+            raise CraftyAPIError(f'Unexpected backup list: {_shorten(repr(body), MAX_LOGGED_BODY_LENGTH)}')
+        return [backup for backup in body if isinstance(backup, dict) and backup.get('backup_id')]
+
+    async def run_backup(self, server_id: str, backup_id: str) -> None:
+        """Start the backup with the given configuration. Crafty runs it in the background."""
+        await self.run_action(server_id, ServerAction.BACKUP, backup_id)
