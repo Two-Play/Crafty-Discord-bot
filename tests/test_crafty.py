@@ -91,6 +91,18 @@ class TestCraftyClient(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(CraftyAPIError):
             await self.client.run_action(SERVER_ID, ServerAction.START)
 
+    async def test_long_error_body_is_shortened(self):
+        self.session.request.return_value = make_response(body={'status': 'error', 'error': 'x' * 1000})
+        with self.assertRaises(CraftyAPIError) as cm:
+            await self.client.list_servers()
+        self.assertLess(len(str(cm.exception)), 400)
+
+    async def test_logs_requests_at_debug(self):
+        self.session.request.return_value = make_response(body={'status': 'ok', 'data': []})
+        with self.assertLogs('core.crafty', level='DEBUG') as logs:
+            await self.client.list_servers()
+        self.assertIn('GET /api/v2/servers -> HTTP', logs.output[0])
+
 
 if __name__ == '__main__':
     unittest.main()

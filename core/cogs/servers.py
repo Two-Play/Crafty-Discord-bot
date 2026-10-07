@@ -47,6 +47,7 @@ class ServerCommands(commands.Cog, name='Servers'):
         if not self._server_cache or now - self._server_cache_time >= SERVER_LIST_CACHE_TTL:
             self._server_cache = await self._client.list_servers()
             self._server_cache_time = now
+            logger.debug('Server list cache refreshed (%d servers)', len(self._server_cache))
         return self._server_cache
 
     async def server_autocomplete(self, _interaction: Interaction,
@@ -103,7 +104,7 @@ class ServerCommands(commands.Cog, name='Servers'):
             return
 
         await self._client.run_action(server_id, ServerAction.START)
-        logger.info('Server %s started by %s', server_id, ctx.author)
+        logger.info('Server %s started by %s (%s)', server_id, ctx.author, ctx.author.id)
         await ctx.reply('Server started')
 
     @commands.hybrid_command(name='stop', description='stop a server')
@@ -114,7 +115,7 @@ class ServerCommands(commands.Cog, name='Servers'):
             return
 
         await self._client.run_action(server_id, ServerAction.STOP)
-        logger.info('Server %s stopped by %s', server_id, ctx.author)
+        logger.info('Server %s stopped by %s (%s)', server_id, ctx.author, ctx.author.id)
         await ctx.reply('Server stopped')
 
     @commands.hybrid_command(name='restart', description='restart a server')
@@ -125,5 +126,5 @@ class ServerCommands(commands.Cog, name='Servers'):
             return
 
         await self._client.run_action(server_id, ServerAction.RESTART)
-        logger.info('Server %s restarted by %s', server_id, ctx.author)
+        logger.info('Server %s restarted by %s (%s)', server_id, ctx.author, ctx.author.id)
         await ctx.reply('Server restarted')

@@ -40,6 +40,12 @@ class TestAutoStop(unittest.IsolatedAsyncioTestCase):
             await self.cog.stop_idle_servers.coro(self.cog)
         self.assertEqual(self.client.run_action.await_count, 2)
 
+    async def test_unexpected_error_on_one_server_continues_with_others(self):
+        self.client.list_servers.return_value = [{'server_id': 'broken'}, {'server_id': 'idle'}]
+        with self.assertLogs('core.cogs.auto_stop', level='ERROR'):
+            await self.cog.stop_idle_servers.coro(self.cog)
+        self.client.run_action.assert_awaited_once_with('idle', ServerAction.STOP)
+
 
 if __name__ == '__main__':
     unittest.main()
