@@ -66,6 +66,33 @@ class TestCraftyBot(unittest.IsolatedAsyncioTestCase):
                     await bot.on_command_error(ctx, error)
                 self.assertIn(expected, ctx.send.call_args.args[0])
 
+    async def test_error_logs_contain_user(self):
+        bot = self.make_bot()
+        ctx = MagicMock()
+        ctx.send = AsyncMock()
+        ctx.author.__str__.return_value = 'alice'
+        ctx.author.id = 7
+        ctx.command.qualified_name = 'sync'
+        with self.assertLogs('core.bot', level='WARNING') as logs:
+            await bot.on_command_error(ctx, commands.NotOwner())
+        self.assertIn('alice (7)', logs.output[0])
+        self.assertIn('sync', logs.output[0])
+
+    async def test_command_invocation_is_logged(self):
+        bot = self.make_bot()
+        ctx = MagicMock()
+        ctx.guild = None
+        ctx.interaction = None
+        ctx.args = [MagicMock(spec=commands.Cog), MagicMock(spec=commands.Context), 'abc']
+        ctx.kwargs = {}
+        ctx.command.qualified_name = 'stats'
+        with self.assertLogs('core.bot', level='DEBUG') as logs:
+            await bot.on_command(ctx)
+            await bot.on_command_completion(ctx)
+        self.assertIn("stats with ['abc']", logs.output[0])
+        self.assertIn('DM [prefix]', logs.output[0])
+        self.assertIn('completed', logs.output[1])
+
 
 if __name__ == '__main__':
     unittest.main()

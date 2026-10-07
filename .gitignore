@@ -11,3 +11,6 @@ __pycache__/
 coverage.xml
 .venv/
 venv/
+
+logs/
+*.log

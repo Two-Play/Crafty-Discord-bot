@@ -29,7 +29,8 @@ class AdminCommands(commands.Cog, name='Admin'):
         if guild is not None:
             self.bot.tree.copy_global_to(guild=guild)
         synced = await self.bot.tree.sync(guild=guild)
-        logger.info('Synced %d slash commands', len(synced))
+        logger.info('%s synced %d slash commands %s', ctx.author, len(synced),
+                    f'to guild {guild.id}' if guild is not None else 'globally')
         await ctx.reply(f'{len(synced)} commands synced')
 
     @commands.hybrid_command(name='clear', description='Clear all slash commands')
@@ -37,6 +38,7 @@ class AdminCommands(commands.Cog, name='Admin'):
     async def clear(self, ctx: commands.Context) -> None:
         """Remove the guild slash commands from the local command tree (run `sync` afterwards)."""
         self.bot.tree.clear_commands(guild=self.bot.guild)
+        logger.info('%s cleared the slash commands from the local command tree', ctx.author)
         await ctx.reply('All commands cleared')
 
     @commands.hybrid_command(name='commands', description='Get all slash commands')
@@ -56,5 +58,5 @@ class AdminCommands(commands.Cog, name='Admin'):
             return
 
         await self.bot.crafty.login(settings.crafty_username, settings.crafty_password)
-        logger.info('Crafty token retrieved')
+        logger.info('%s retrieved a new Crafty token', ctx.author)
         await ctx.reply('Token successfully retrieved')
