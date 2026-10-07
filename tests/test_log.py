@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr
 
-from core.log import setup_logging
+from core.log import LOG_BUFFER, LogBuffer, get_log_level, set_log_level, setup_logging
 
 
 class TestSetupLogging(unittest.TestCase):
@@ -38,7 +38,9 @@ class TestSetupLogging(unittest.TestCase):
     def test_reconfigure_replaces_handlers(self):
         setup_logging()
         setup_logging()
-        self.assertEqual(len(logging.getLogger().handlers), 1)
+        handlers = logging.getLogger().handlers
+        self.assertEqual(len(handlers), 2)
+        self.assertIn(LOG_BUFFER, handlers)
 
     def test_log_file(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -53,6 +55,49 @@ class TestSetupLogging(unittest.TestCase):
             with open(path, encoding='utf-8') as file:
                 self.assertIn('hello file', file.read())
             setup_logging()  # close the file handler before the directory is removed
+
+    def test_set_and_get_log_level(self):
+        setup_logging()
+        set_log_level('warning')
+        self.assertEqual(get_log_level(), 'WARNING')
+        with self.assertRaises(ValueError):
+            set_log_level('LOUD')
+
+
+class TestLogBuffer(unittest.TestCase):
+
+    def setUp(self):
+        self.buffer = LogBuffer(capacity=3)
+        self.logger = logging.getLogger('core.test.buffer')
+        self.logger.addHandler(self.buffer)
+        self.logger.propagate = False
+        self.logger.setLevel(logging.DEBUG)
+        self.addCleanup(self.logger.removeHandler, self.buffer)
+        self.addCleanup(setattr, self.logger, 'propagate', True)
+
+    def test_keeps_the_newest_entries(self):
+        for number in range(5):
+            self.logger.info('entry %d', number)
+        entries = self.buffer.entries()
+        self.assertEqual([entry['message'] for entry in entries], ['entry 2', 'entry 3', 'entry 4'])
+        self.assertEqual([entry['id'] for entry in entries], [3, 4, 5])
+        self.assertEqual(entries[0]['logger'], 'core.test.buffer')
+
+    def test_after_and_limit(self):
+        for number in range(3):
+            self.logger.info('entry %d', number)
+        self.assertEqual([entry['id'] for entry in self.buffer.entries(after=1)], [2, 3])
+        self.assertEqual([entry['id'] for entry in self.buffer.entries(limit=1)], [3])
+        self.assertEqual(self.buffer.entries(limit=0), [])
+
+    def test_exception_is_included(self):
+        try:
+            raise ValueError('broken')
+        except ValueError:
+            self.logger.exception('failed')
+        message = self.buffer.entries()[-1]['message']
+        self.assertTrue(message.startswith('failed\n'))
+        self.assertIn('ValueError: broken', message)
 
 
 if __name__ == '__main__':

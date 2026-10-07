@@ -17,7 +17,7 @@ import socket
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Union
 
 from aiohttp import web
 from discord.ext import commands
@@ -26,6 +26,7 @@ from core import __version__
 from core.crafty import CraftyAPIError, JsonDict, busy_state, player_count, player_names
 from core.flags import FlagError, FlagSaveError
 from core.formatting import format_memory
+from core.log import LEVELS, LOG_BUFFER, get_log_level, set_log_level
 
 if TYPE_CHECKING:
     from core.bot import CraftyBot
@@ -42,6 +43,7 @@ STATIC_FILES = {
 # Sent by app.js on every write. Browsers only allow custom headers on cross-origin requests after a
 # CORS preflight, which this server never answers, so other sites can't change flags (CSRF).
 CSRF_HEADER = 'X-Crafty-Bot'
+MAX_LOG_ENTRIES = 500  # per request
 SECURITY_HEADERS = {
     'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
                                "img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
@@ -111,6 +113,8 @@ class WebDashboard(commands.Cog):
         app.router.add_get('/api/status', self._status)
         app.router.add_get('/api/flags', self._get_flags)
         app.router.add_put('/api/flags/{name}', self._set_flag)
+        app.router.add_get('/api/logs', self._get_logs)
+        app.router.add_put('/api/log-level', self._set_log_level)
         for path, (file_name, content_type) in STATIC_FILES.items():
             app.router.add_get(path, self._static_handler(file_name, content_type))
         return app
@@ -192,29 +196,41 @@ class WebDashboard(commands.Cog):
             return web.json_response({'error': 'Internal error, check the bot logs.'}, status=500)
 
     @property
-    def flags_editable(self) -> bool:
-        """Flags can only be changed when the dashboard is protected by a password."""
+    def editable(self) -> bool:
+        """Settings can only be changed when the dashboard is protected by a password."""
         return bool(self.bot.settings.web_password)
 
-    def _flags_response(self) -> web.Response:
-        return web.json_response({'flags': self.bot.flags.as_list(), 'editable': self.flags_editable})
-
-    async def _get_flags(self, _request: web.Request) -> web.StreamResponse:
-        return self._flags_response()
-
-    async def _set_flag(self, request: web.Request) -> web.StreamResponse:
-        if not self.flags_editable:
-            return web.json_response({'error': 'Set WEB_PASSWORD to change feature flags.'}, status=403)
+    async def _write_request_body(self, request: web.Request, what: str) -> Union[Dict[str, Any], web.Response]:
+        """
+        Check a request that changes something and return its JSON object body, or the error
+        response to send instead.
+        """
+        if not self.editable:
+            return web.json_response({'error': f'Set WEB_PASSWORD to change {what}.'}, status=403)
         if request.headers.get(CSRF_HEADER) != '1' or request.content_type != 'application/json':
-            logger.warning('Rejected feature flag change without CSRF header from %s', request.remote)
+            logger.warning('Rejected change of %s without CSRF header from %s', what, request.remote)
             return web.json_response({'error': 'Invalid request.'}, status=400)
         try:
             body = await request.json()
         except ValueError:
             return web.json_response({'error': 'Invalid JSON.'}, status=400)
+        if not isinstance(body, dict):
+            return web.json_response({'error': 'Expected a JSON object.'}, status=400)
+        return body
+
+    def _flags_response(self) -> web.Response:
+        return web.json_response({'flags': self.bot.flags.as_list(), 'editable': self.editable})
+
+    async def _get_flags(self, _request: web.Request) -> web.StreamResponse:
+        return self._flags_response()
+
+    async def _set_flag(self, request: web.Request) -> web.StreamResponse:
+        body = await self._write_request_body(request, 'feature flags')
+        if isinstance(body, web.Response):
+            return body
 
         name = request.match_info['name']
-        enabled = body.get('enabled') if isinstance(body, dict) else None
+        enabled = body.get('enabled')
         try:
             self.bot.flags.set(name, enabled)
         except FlagSaveError as exc:
@@ -227,6 +243,33 @@ class WebDashboard(commands.Cog):
                     request.remote)
         self._snapshot = None  # the bot status shows the auto stop flag
         return self._flags_response()
+
+    async def _get_logs(self, request: web.Request) -> web.StreamResponse:
+        try:
+            after = max(int(request.query.get('after', 0)), 0)
+        except ValueError:
+            return web.json_response({'error': 'after must be a number.'}, status=400)
+        return web.json_response({
+            'entries': LOG_BUFFER.entries(after, MAX_LOG_ENTRIES),
+            'level': get_log_level(),
+            'levels': list(LEVELS),
+            'editable': self.editable,
+        })
+
+    async def _set_log_level(self, request: web.Request) -> web.StreamResponse:
+        body = await self._write_request_body(request, 'the log level')
+        if isinstance(body, web.Response):
+            return body
+
+        level = str(body.get('level', '')).upper()
+        if level not in LEVELS:
+            return web.json_response({'error': f"Log level must be one of {', '.join(LEVELS)}."}, status=400)
+        previous = get_log_level()
+        set_log_level(level)
+        # WARNING, so the change is visible whatever the new level is.
+        logger.warning('Log level changed from %s to %s in the dashboard (%s), until the next restart',
+                       previous, level, request.remote)
+        return web.json_response({'level': get_log_level()})
 
     async def snapshot(self) -> Dict[str, Any]:
         """Return the current status, cached for a few seconds."""
