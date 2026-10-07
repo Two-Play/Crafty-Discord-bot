@@ -1,0 +1,171 @@
+import unittest
+from unittest.mock import MagicMock
+
+import requests
+
+from core.crafty import (CraftyAPIError, CraftyClient, ServerAction, busy_state, parse_server_id, player_count,
+                         player_names)
+
+SERVER_ID = 'ff231030-910c-4aaa-bd83-50e03aedab1c'
+
+
+def make_response(status_code=200, body=None):
+    response = MagicMock()
+    response.status_code = status_code
+    response.ok = status_code < 400
+    response.json.return_value = {'status': 'ok', 'data': {}} if body is None else body
+    return response
+
+
+class TestParseServerId(unittest.TestCase):
+
+    def test_valid(self):
+        self.assertEqual(parse_server_id(SERVER_ID), SERVER_ID)
+
+    def test_normalizes(self):
+        self.assertEqual(parse_server_id(SERVER_ID.upper().replace('-', '')), SERVER_ID)
+
+    def test_invalid(self):
+        for value in ('abc', '', None, '../stats'):
+            with self.subTest(value=value):
+                self.assertIsNone(parse_server_id(value))
+
+
+class TestStatsHelpers(unittest.TestCase):
+
+    def test_player_count(self):
+        self.assertEqual(player_count({'int_ping_results': 'True', 'online': 3}), 3)
+        self.assertEqual(player_count({'int_ping_results': 'True', 'online': 0}), 0)
+        self.assertEqual(player_count({'int_ping_results': True, 'online': 0}), 0)
+
+    def test_player_count_unknown_without_ping(self):
+        self.assertIsNone(player_count({'int_ping_results': 'False', 'online': 0}))
+        self.assertIsNone(player_count({'online': False}))
+        self.assertIsNone(player_count({}))
+
+    def test_player_count_positive_count_without_ping_flag(self):
+        self.assertEqual(player_count({'online': 2}), 2)
+
+    def test_player_names(self):
+        self.assertEqual(player_names({'players': "['Steve', 'Alex']"}), ['Steve', 'Alex'])
+        self.assertEqual(player_names({'players': ['Steve']}), ['Steve'])
+        self.assertEqual(player_names({'players': 'False'}), [])
+        self.assertEqual(player_names({'players': 'not a list ['}), [])
+        self.assertEqual(player_names({}), [])
+
+    def test_busy_state(self):
+        self.assertEqual(busy_state({'waiting_start': True}), 'starting')
+        self.assertEqual(busy_state({'updating': True}), 'updating')
+        self.assertIsNone(busy_state({'waiting_start': False, 'updating': False, 'importing': False}))
+
+
+class TestCraftyClient(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self):
+        self.session = MagicMock()
+        self.session.headers = {}
+        self.client = CraftyClient('https://crafty.local/', 'token', session=self.session, timeout=3)
+
+    def test_sets_auth_header(self):
+        self.assertEqual(self.session.headers['Authorization'], 'Bearer token')
+
+    async def test_list_servers(self):
+        self.session.request.return_value = make_response(body={'status': 'ok', 'data': [{'server_id': 'a'}]})
+        self.assertEqual(await self.client.list_servers(), [{'server_id': 'a'}])
+        self.session.request.assert_called_once_with('GET', 'https://crafty.local/api/v2/servers', json=None,
+                                                     timeout=3, verify=False)
+
+    async def test_get_stats(self):
+        self.session.request.return_value = make_response(body={'status': 'ok', 'data': {'running': True}})
+        self.assertEqual(await self.client.get_stats(SERVER_ID), {'running': True})
+        self.assertEqual(self.session.request.call_args.args[1],
+                         f'https://crafty.local/api/v2/servers/{SERVER_ID}/stats')
+
+    async def test_run_action(self):
+        self.session.request.return_value = make_response()
+        await self.client.run_action(SERVER_ID, ServerAction.RESTART)
+        self.assertEqual(self.session.request.call_args.args,
+                         ('POST', f'https://crafty.local/api/v2/servers/{SERVER_ID}/action/restart_server'))
+
+    async def test_login_sets_token(self):
+        self.session.request.return_value = make_response(body={'status': 'ok', 'data': {'token': 'new'}})
+        await self.client.login('user', 'pw')
+        self.assertEqual(self.session.request.call_args.kwargs['json'], {'username': 'user', 'password': 'pw'})
+        self.assertEqual(self.session.headers['Authorization'], 'Bearer new')
+
+    async def test_login_without_token_raises(self):
+        self.session.request.return_value = make_response(body={'status': 'ok', 'data': {}})
+        with self.assertRaises(CraftyAPIError):
+            await self.client.login('user', 'pw')
+
+    async def test_network_error_raises(self):
+        self.session.request.side_effect = requests.ConnectionError('down')
+        with self.assertRaises(CraftyAPIError):
+            await self.client.list_servers()
+
+    async def test_http_error_raises(self):
+        self.session.request.return_value = make_response(status_code=403)
+        with self.assertRaises(CraftyAPIError):
+            await self.client.list_servers()
+
+    async def test_invalid_json_raises(self):
+        response = make_response()
+        response.json.side_effect = ValueError
+        self.session.request.return_value = response
+        with self.assertRaises(CraftyAPIError):
+            await self.client.list_servers()
+
+    async def test_error_status_raises(self):
+        self.session.request.return_value = make_response(body={'status': 'error', 'error': 'NOT_AUTHORIZED'})
+        with self.assertRaises(CraftyAPIError):
+            await self.client.run_action(SERVER_ID, ServerAction.START)
+
+    async def test_long_error_body_is_shortened(self):
+        self.session.request.return_value = make_response(body={'status': 'error', 'error': 'x' * 1000})
+        with self.assertRaises(CraftyAPIError) as cm:
+            await self.client.list_servers()
+        self.assertLess(len(str(cm.exception)), 400)
+
+    async def test_logs_requests_at_debug(self):
+        self.session.request.return_value = make_response(body={'status': 'ok', 'data': []})
+        with self.assertLogs('core.crafty', level='DEBUG') as logs:
+            await self.client.list_servers()
+        self.assertIn('GET /api/v2/servers -> HTTP', logs.output[0])
+
+
+class TestCraftyClientBackups(unittest.IsolatedAsyncioTestCase):
+
+    def setUp(self):
+        self.session = MagicMock()
+        self.session.headers = {}
+        self.client = CraftyClient('https://crafty.local', 'token', session=self.session)
+
+    async def test_list_backups_without_envelope(self):
+        # Crafty 4.11 returns the backups as a dict keyed by ID, without {"status", "data"}
+        self.session.request.return_value = make_response(body={
+            'b1': {'backup_id': 'b1', 'backup_name': 'Default', 'default': True},
+            'b2': {'backup_id': 'b2', 'backup_name': 'Weekly', 'default': False},
+        })
+        backups = await self.client.list_backups(SERVER_ID)
+        self.assertEqual([backup['backup_id'] for backup in backups], ['b1', 'b2'])
+        self.assertEqual(self.session.request.call_args.args,
+                         ('GET', f'https://crafty.local/api/v2/servers/{SERVER_ID}/backups'))
+
+    async def test_list_backups_with_envelope(self):
+        self.session.request.return_value = make_response(body={'status': 'ok', 'data': [{'backup_id': 'b1'}]})
+        self.assertEqual(await self.client.list_backups(SERVER_ID), [{'backup_id': 'b1'}])
+
+    async def test_list_backups_not_authorized(self):
+        self.session.request.return_value = make_response(400, {'status': 'error', 'error': 'NOT_AUTHORIZED'})
+        with self.assertRaises(CraftyAPIError):
+            await self.client.list_backups(SERVER_ID)
+
+    async def test_run_backup(self):
+        self.session.request.return_value = make_response(body={'status': 'ok'})
+        await self.client.run_backup(SERVER_ID, 'b1')
+        self.assertEqual(self.session.request.call_args.args,
+                         ('POST', f'https://crafty.local/api/v2/servers/{SERVER_ID}/action/backup_server/b1'))
+
+
+if __name__ == '__main__':
+    unittest.main()

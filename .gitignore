@@ -9,3 +9,9 @@ __pycache__/
 .coverage
 
 coverage.xml
+.venv/
+venv/
+
+logs/
+*.log
+data/
