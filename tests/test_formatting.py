@@ -1,6 +1,6 @@
 import unittest
 
-from core.formatting import format_server_list, format_server_stats
+from core.formatting import format_memory, format_server_list, format_server_stats
 
 
 class TestFormatServerList(unittest.TestCase):
@@ -39,52 +39,50 @@ class TestFormatServerList(unittest.TestCase):
 
 class TestFormatServerStats(unittest.TestCase):
 
+    # Shape of GET /api/v2/servers/{id}/stats in Crafty 4.11
+    RUNNING = {
+        'world_name': 'World1', 'running': True, 'int_ping_results': 'True', 'online': 2, 'max': 20,
+        'players': "['Steve', 'Alex']", 'version': '1.21.4', 'cpu': 12.5, 'mem': 1610612736.0,
+        'mem_percent': 25.0, 'waiting_start': False, 'updating': False, 'importing': False, 'crashed': False,
+    }
+
     def test_server_status_running(self):
-        data = {
-            'data': {
-                'world_name': 'World1',
-                'running': True,
-                'players': 5,
-                'version': '1.16.5',
-                'cpu': 50,
-                'mem': 1024,
-                'mem_percent': 25
-            }
-        }
         expected_output = (
-            "```\nWorld: World1\nRunning: True\nPlayers: 5\nVersion: 1.16.5\nCPU: 50%\nRAM: 1024MB (25%)\n```\n"
+            "```\nWorld: World1\nRunning: True\nPlayers: 2/20 (Steve, Alex)\nVersion: 1.21.4\n"
+            "CPU: 12.5%\nRAM: 1.5 GB (25.0%)\n```\n"
         )
-        self.assertEqual(format_server_stats(data['data']), expected_output)
+        self.assertEqual(format_server_stats(self.RUNNING), expected_output)
 
     def test_server_status_stopped(self):
-        data = {
-            'data': {
-                'world_name': 'World1',
-                'running': False,
-                'cpu': '',
-                'mem': '',
-                'mem_percent': ''
-            }
-        }
-        expected_output = "```\nWorld: World1\nRunning: False\n```\n"
-        self.assertEqual(format_server_stats(data['data']), expected_output)
+        data = {'world_name': 'World1', 'running': False, 'int_ping_results': 'False', 'online': 0,
+                'players': 'False', 'version': 'False', 'cpu': 0.0, 'mem': 0.0, 'mem_percent': 0.0}
+        self.assertEqual(format_server_stats(data), "```\nWorld: World1\nRunning: False\n```\n")
+
+    def test_server_status_ping_failed(self):
+        data = {**self.RUNNING, 'int_ping_results': 'False', 'online': 0, 'max': 0, 'players': 'False',
+                'version': 'False', 'waiting_start': True}
+        output = format_server_stats(data)
+        self.assertIn('Status: starting', output)
+        self.assertIn('Players: unknown', output)
+        self.assertIn('Version: unknown', output)
 
     def test_server_status_missing_fields(self):
-        data = {
-            'data': {
-                'world_name': 'World1',
-                'running': True,
-                'players': 5,
-                'version': '1.16.5',
-                'cpu': 50,
-                'mem': 23,
-                'mem_percent': 12
-            }
-        }
-        expected_output = (
-            "```\nWorld: World1\nRunning: True\nPlayers: 5\nVersion: 1.16.5\nCPU: 50%\nRAM: 23MB (12%)\n```\n"
-        )
-        self.assertEqual(format_server_stats(data['data']), expected_output)
+        output = format_server_stats({'running': True})
+        self.assertIn('World: unknown', output)
+        self.assertIn('Players: unknown', output)
+        self.assertIn('RAM: ? (?%)', output)
+
+
+class TestFormatMemory(unittest.TestCase):
+
+    def test_units(self):
+        self.assertEqual(format_memory(512), '512 B')
+        self.assertEqual(format_memory(2048), '2.0 KB')
+        self.assertEqual(format_memory(1610612736.0), '1.5 GB')
+
+    def test_already_formatted(self):
+        self.assertEqual(format_memory('1.5GB'), '1.5GB')
+        self.assertEqual(format_memory(None), '?')
 
 
 if __name__ == '__main__':

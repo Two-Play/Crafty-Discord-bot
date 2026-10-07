@@ -4,6 +4,7 @@ Client for the Crafty Controller 4 REST API.
 
 from __future__ import annotations
 
+import ast
 import asyncio
 import logging
 import time
@@ -44,6 +45,48 @@ def parse_server_id(value: str) -> Optional[str]:
         return str(uuid.UUID(value))
     except (ValueError, TypeError, AttributeError):
         return None
+
+
+def _is_true(value: Any) -> bool:
+    """Crafty returns some flags as booleans and others as the strings 'True'/'False'."""
+    return value is True or str(value).lower() == 'true'
+
+
+def player_count(stats: JsonDict) -> Optional[int]:
+    """
+    Return the number of players online, or ``None`` if it is unknown.
+
+    Crafty gets the player count by pinging the server. If the ping fails (the server is
+    still starting, doesn't answer pings, or the port is configured wrong), ``online`` is
+    reported as 0, so 0 only counts if ``int_ping_results`` says the ping worked.
+    """
+    online = stats.get('online')
+    if isinstance(online, int) and not isinstance(online, bool) and online > 0:
+        return online
+    if _is_true(stats.get('int_ping_results')):
+        return 0
+    return None
+
+
+def player_names(stats: JsonDict) -> List[str]:
+    """Return the names of the online players (Crafty sends them as a stringified list)."""
+    players = stats.get('players')
+    if isinstance(players, str):
+        try:
+            players = ast.literal_eval(players)
+        except (ValueError, SyntaxError):
+            return []
+    if not isinstance(players, (list, tuple)):
+        return []
+    return [str(player) for player in players]
+
+
+def busy_state(stats: JsonDict) -> Optional[str]:
+    """Return what the server is busy with (starting, updating, importing), or ``None``."""
+    for field, state in (('waiting_start', 'starting'), ('updating', 'updating'), ('importing', 'importing')):
+        if _is_true(stats.get(field)):
+            return state
+    return None
 
 
 def _shorten(text: str, length: int) -> str:
