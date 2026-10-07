@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 import uuid
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -18,6 +19,7 @@ logger = logging.getLogger(__name__)
 SERVERS_ENDPOINT = '/api/v2/servers'
 LOGIN_ENDPOINT = '/api/v2/auth/login'
 DEFAULT_TIMEOUT = 6  # seconds
+MAX_LOGGED_BODY_LENGTH = 300
 
 JsonDict = Dict[str, Any]
 
@@ -42,6 +44,10 @@ def parse_server_id(value: str) -> Optional[str]:
         return str(uuid.UUID(value))
     except (ValueError, TypeError, AttributeError):
         return None
+
+
+def _shorten(text: str, length: int) -> str:
+    return text if len(text) <= length else text[:length] + '...'
 
 
 class CraftyClient:
@@ -73,11 +79,14 @@ class CraftyClient:
         self._session.close()
 
     def _request(self, method: str, path: str, payload: Optional[JsonDict] = None) -> JsonDict:
+        start = time.monotonic()
         try:
             response = self._session.request(method, self._base_url + path, json=payload,
                                              timeout=self._timeout, verify=self._verify_ssl)
         except requests.RequestException as exc:
             raise CraftyAPIError(f'{method} {path} failed: {exc}') from exc
+        logger.debug('%s %s -> HTTP %d (%.0f ms)', method, path, response.status_code,
+                     (time.monotonic() - start) * 1000)
 
         if not response.ok:
             raise CraftyAPIError(f'{method} {path} returned HTTP {response.status_code}')
@@ -86,11 +95,11 @@ class CraftyClient:
         except ValueError as exc:
             raise CraftyAPIError(f'{method} {path} returned invalid JSON') from exc
         if not isinstance(body, dict) or body.get('status') != 'ok':
-            raise CraftyAPIError(f'{method} {path} returned an error: {body!r}')
+            raise CraftyAPIError(f'{method} {path} returned an error: '
+                                 f'{_shorten(repr(body), MAX_LOGGED_BODY_LENGTH)}')
         return body
 
     async def _call(self, method: str, path: str, payload: Optional[JsonDict] = None) -> JsonDict:
-        logger.debug('%s %s', method, path)
         return await asyncio.to_thread(self._request, method, path, payload)
 
     async def login(self, username: str, password: str) -> None:
@@ -101,6 +110,7 @@ class CraftyClient:
         except (KeyError, TypeError) as exc:
             raise CraftyAPIError('Login response did not contain a token') from exc
         self.set_token(token)
+        logger.debug('Using the token from the login of %s', username)
 
     async def list_servers(self) -> List[JsonDict]:
         """Return all servers visible to the API user."""

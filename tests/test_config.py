@@ -18,16 +18,18 @@ class TestSettingsFromEnv(unittest.TestCase):
         self.assertEqual(settings.auto_stop_interval, DEFAULT_AUTO_STOP_INTERVAL)
         self.assertFalse(settings.verify_ssl)
         self.assertEqual(settings.log_level, 'INFO')
+        self.assertIsNone(settings.log_file)
 
     def test_optional_vars(self):
         settings = Settings.from_env({**REQUIRED, 'GUILD_ID': '42', 'ENABLE_AUTO_STOP_SERVER': 'true',
                                       'AUTO_STOP_SLEEP_TIME': '60', 'CRAFTY_VERIFY_SSL': 'yes',
-                                      'LOG_LEVEL': 'debug'})
+                                      'LOG_LEVEL': 'debug', 'LOG_FILE': 'logs/bot.log'})
         self.assertEqual(settings.guild_id, 42)
         self.assertTrue(settings.auto_stop_enabled)
         self.assertEqual(settings.auto_stop_interval, 60)
         self.assertTrue(settings.verify_ssl)
         self.assertEqual(settings.log_level, 'DEBUG')
+        self.assertEqual(settings.log_file, 'logs/bot.log')
 
     def test_missing_all_vars(self):
         with self.assertRaises(ConfigError):

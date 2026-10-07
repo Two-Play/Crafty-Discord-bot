@@ -197,7 +197,8 @@ fields.
 | `ENABLE_AUTO_STOP_SERVER`               | no       | `true` to stop running servers without players automatically                   |
 | `AUTO_STOP_SLEEP_TIME`                  | no       | Interval of the auto stop check in seconds (default `1800`)                    |
 | `CRAFTY_VERIFY_SSL`                     | no       | `true` to verify the TLS certificate of Crafty (default `false`, self-signed)  |
-| `LOG_LEVEL`                             | no       | `DEBUG`, `INFO` (default), `WARNING` or `ERROR`                                |
+| `LOG_LEVEL`                             | no       | `DEBUG`, `INFO` (default), `WARNING` or `ERROR` (libraries never log below `INFO`) |
+| `LOG_FILE`                              | no       | Also write the log to this file, e.g. `logs/bot.log` (rotated at 5 MB, 3 backups) |
 
 \* Either `CRAFTY_TOKEN` or `CRAFTY_USERNAME` and `CRAFTY_PASSWORD` must be set.
 
