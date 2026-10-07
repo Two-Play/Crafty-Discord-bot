@@ -31,9 +31,24 @@
     <h2>Servers</h2>
     <section class="servers" id="servers" aria-live="polite"></section>
     <p class="muted" id="empty" hidden>No servers visible to the Crafty API user.</p>
+
+    <h2>Feature flags</h2>
+    <p class="muted hint" id="flags-hint" hidden>Set <code>WEB_PASSWORD</code> to change the feature flags here.</p>
+    <p class="alert" id="flags-error" hidden></p>
+    <section class="flags" id="flags"></section>
   </main>
 
   <footer class="muted">Crafty Bot <span id="version"></span> · refreshes every 30 seconds</footer>
+
+  <template id="flag-template">
+    <label class="flag">
+      <span class="flag-text">
+        <span class="flag-label"></span>
+        <span class="flag-description muted"></span>
+      </span>
+      <input type="checkbox" role="switch">
+    </label>
+  </template>
 
   <template id="server-template">
     <article class="server">

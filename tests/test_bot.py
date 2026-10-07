@@ -7,8 +7,10 @@ from discord.ext import commands
 from core.bot import CraftyBot, unwrap_error
 from core.config import Settings
 from core.crafty import CraftyAPIError
+from core.flags import FeatureDisabled
 
-SETTINGS = Settings(server_url='https://crafty.local', discord_token='discord', crafty_token='crafty')
+SETTINGS = Settings(server_url='https://crafty.local', discord_token='discord', crafty_token='crafty',
+                    flags_file='')
 
 
 class TestUnwrapError(unittest.TestCase):
@@ -35,7 +37,7 @@ class TestCraftyBot(unittest.IsolatedAsyncioTestCase):
         await bot.setup_hook()
         self.assertIsNotNone(bot.get_cog('Servers'))
         self.assertIsNotNone(bot.get_cog('Admin'))
-        self.assertIsNone(bot.get_cog('AutoStop'))
+        self.assertFalse(bot.get_cog('AutoStop').enabled)
         self.crafty.login.assert_not_awaited()
 
     async def test_setup_loads_dashboard_when_enabled(self):
@@ -75,6 +77,7 @@ class TestCraftyBot(unittest.IsolatedAsyncioTestCase):
             (commands.MissingRequiredArgument(MagicMock()), 'Missing required argument'),
             (commands.BadArgument('Invalid server ID'), 'Invalid server ID'),
             (commands.NotOwner(), 'not allowed'),
+            (FeatureDisabled('stop'), '`stop` command is currently disabled'),
             (commands.CommandInvokeError(CraftyAPIError('down')), 'Crafty Controller failed'),
             (commands.CommandInvokeError(RuntimeError('boom')), 'unexpected error'),
         ]

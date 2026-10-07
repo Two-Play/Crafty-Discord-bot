@@ -17,6 +17,7 @@ from core.cogs.auto_stop import AutoStop
 from core.cogs.servers import ServerCommands
 from core.config import Settings
 from core.crafty import CraftyAPIError, CraftyClient
+from core.flags import FeatureDisabled, FeatureFlags, flag_definitions
 from core.help_command import HelpCommand
 from core.web.dashboard import DashboardStartError, WebDashboard
 
@@ -55,6 +56,7 @@ class CraftyBot(commands.Bot):
         super().__init__(command_prefix=COMMAND_PREFIX, intents=intents, help_command=HelpCommand())
         self.settings = settings
         self.crafty = crafty
+        self.flags = FeatureFlags(flag_definitions(settings.auto_stop_enabled), settings.flags_file)
 
     @property
     def guild(self) -> Optional[discord.Object]:
@@ -69,13 +71,10 @@ class CraftyBot(commands.Bot):
             await self.crafty.login(self.settings.crafty_username, self.settings.crafty_password)
             logger.info('Logged in to Crafty as %s', self.settings.crafty_username)
 
-        await self.add_cog(ServerCommands(self.crafty))
+        await self.add_cog(ServerCommands(self.crafty, self.flags))
         await self.add_cog(AdminCommands(self))
-        if self.settings.auto_stop_enabled:
-            await self.add_cog(AutoStop(self.crafty, self.settings.auto_stop_interval))
-            logger.info('Auto stop enabled (every %d seconds)', self.settings.auto_stop_interval)
-        else:
-            logger.info('Auto stop disabled')
+        # Always loaded, so the auto_stop feature flag can switch it on and off at runtime.
+        await self.add_cog(AutoStop(self.crafty, self.settings.auto_stop_interval, self.flags))
         if self.settings.web_enabled:
             try:
                 await self.add_cog(WebDashboard(self))
@@ -119,6 +118,9 @@ class CraftyBot(commands.Bot):
                                    'list of available commands.')
             else:
                 await context.send(str(error))
+        elif isinstance(error, FeatureDisabled):
+            logger.debug('%s used disabled command %s', origin, command)
+            await context.send(str(error))
         elif isinstance(error, commands.CheckFailure):
             logger.warning('%s is not allowed to use command %s: %s', origin, command,
                            error or type(error).__name__)

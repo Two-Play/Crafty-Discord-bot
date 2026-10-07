@@ -2,6 +2,9 @@
 
 const REFRESH_MS = 30000;
 const $ = (id) => document.getElementById(id);
+// Built from location.origin, which never contains credentials: fetch() refuses relative URLs when the
+// page was opened as http://user:password@host/.
+const api = (path) => new URL(path, location.origin + location.pathname).href;
 
 function formatDuration(seconds) {
   const days = Math.floor(seconds / 86400);
@@ -66,7 +69,7 @@ async function refresh() {
   const button = $('refresh');
   button.disabled = true;
   try {
-    const response = await fetch('api/status', { cache: 'no-store' });
+    const response = await fetch(api('api/status'), { cache: 'no-store' });
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
       throw new Error(body.error || `HTTP ${response.status}`);
@@ -80,6 +83,59 @@ async function refresh() {
   }
 }
 
-$('refresh').addEventListener('click', refresh);
+function showFlagError(message) {
+  $('flags-error').hidden = !message;
+  $('flags-error').textContent = message || '';
+}
+
+async function setFlag(name, enabled, input) {
+  input.disabled = true;
+  try {
+    const response = await fetch(api(`api/flags/${encodeURIComponent(name)}`), {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Crafty-Bot': '1' },
+      body: JSON.stringify({ enabled }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+    showFlagError(null);
+    renderFlags(body);
+    refresh();
+  } catch (error) {
+    input.checked = !enabled;
+    input.disabled = false;
+    showFlagError(`Could not change ${name}: ${error.message}`);
+  }
+}
+
+function renderFlags(data) {
+  $('flags-hint').hidden = data.editable;
+  $('flags').replaceChildren(...data.flags.map((flag) => {
+    const node = $('flag-template').content.cloneNode(true);
+    node.querySelector('.flag-label').textContent = flag.label;
+    node.querySelector('.flag-description').textContent = flag.description;
+    const input = node.querySelector('input');
+    input.checked = flag.enabled;
+    input.disabled = !data.editable;
+    input.setAttribute('aria-label', flag.label);
+    input.addEventListener('change', () => setFlag(flag.name, input.checked, input));
+    return node;
+  }));
+}
+
+async function loadFlags() {
+  try {
+    const response = await fetch(api('api/flags'), { cache: 'no-store' });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+    showFlagError(null);
+    renderFlags(body);
+  } catch (error) {
+    showFlagError(`Could not load the feature flags: ${error.message}`);
+  }
+}
+
+$('refresh').addEventListener('click', () => { refresh(); loadFlags(); });
 refresh();
+loadFlags();
 setInterval(refresh, REFRESH_MS);

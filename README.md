@@ -42,7 +42,8 @@ Discord API.
 - **Server Backup**: Start a backup of a server (bot owner only)
 - **Auto complete (slash commands)**: Auto complete the server and the backup name
 - **Auto stop**: Stop servers without players automatically
-- **Web dashboard**: Read-only status page with the bot and server status
+- **Web dashboard**: Status page with the bot and server status
+- **Feature flags**: Switch commands and auto stop on and off in the web dashboard
 
 ## Roadmap
 
@@ -148,7 +149,13 @@ services:
       # - WEB_PASSWORD=YOUR_DASHBOARD_PASSWORD
     # ports:
     #   - "8080:8080"
+    # Keeps the feature flags changed in the dashboard
+    volumes:
+      - crafty-bot-data:/usr/src/app/data
     restart: unless-stopped
+
+volumes:
+  crafty-bot-data:
 ```
 
 ### Python
@@ -202,14 +209,15 @@ fields.
 | `CRAFTY_TOKEN`                          | yes*     | Your Crafty Controller API token                                               |
 | `CRAFTY_USERNAME` / `CRAFTY_PASSWORD`   | yes*     | Crafty login, used instead of `CRAFTY_TOKEN` if no token is set (not recommended) |
 | `GUILD_ID`                              | no       | Discord server ID for the slash commands (without it they are synced globally) |
-| `ENABLE_AUTO_STOP_SERVER`               | no       | `true` to stop running servers without players automatically. Servers Crafty can't ping (unknown player count) or that are starting/updating are skipped |
+| `ENABLE_AUTO_STOP_SERVER`               | no       | `true` to stop running servers without players automatically (default of the `auto_stop` feature flag). Servers Crafty can't ping (unknown player count) or that are starting/updating are skipped |
 | `AUTO_STOP_SLEEP_TIME`                  | no       | Interval of the auto stop check in seconds (default `1800`)                    |
 | `CRAFTY_VERIFY_SSL`                     | no       | `true` to verify the TLS certificate of Crafty (default `false`, self-signed)  |
 | `LOG_LEVEL`                             | no       | `DEBUG`, `INFO` (default), `WARNING` or `ERROR` (libraries never log below `INFO`) |
-| `WEB_ENABLED`                           | no       | `true` to serve the read-only web dashboard                                    |
+| `WEB_ENABLED`                           | no       | `true` to serve the web dashboard                                              |
 | `WEB_HOST`                              | no       | Interface the dashboard listens on (default `127.0.0.1`, `0.0.0.0` in Docker)  |
 | `WEB_PORT`                              | no       | Port of the dashboard (default `8080`)                                         |
 | `WEB_PASSWORD`                          | no       | Password for the dashboard (HTTP basic auth, any user name). Strongly recommended if it is reachable from other machines |
+| `FLAGS_FILE`                            | no       | File the feature flags are saved to (default `data/feature_flags.json`)        |
 | `LOG_FILE`                              | no       | Also write the log to this file, e.g. `logs/bot.log` (rotated at 5 MB, 3 backups) |
 
 \* Either `CRAFTY_TOKEN` or `CRAFTY_USERNAME` and `CRAFTY_PASSWORD` must be set.
@@ -293,9 +301,17 @@ Crafty first, and the Crafty API token needs the `BACKUP` permission.
 
 ### Web dashboard
 
-Set `WEB_ENABLED=true` to get a read-only status page at `http://HOST:8080` (bot connection, latency, uptime and the
+Set `WEB_ENABLED=true` to get a status page at `http://HOST:8080` (bot connection, latency, uptime and the
 status, players, CPU and RAM of every server). It refreshes every 30 seconds. `/api/status` returns the same data as
 JSON and `/healthz` can be used for health checks (no password needed).
+
+#### Feature flags
+
+The dashboard lists the feature flags: one for each server command (`list`, `stats`, `start`, `stop`, `restart`,
+`backup`) and one for auto stop. A disabled command answers with "The command is currently disabled" and is hidden
+from `>help`. The flags can only be changed when `WEB_PASSWORD` is set, otherwise they are read-only. Changes take
+effect immediately and are saved to `FLAGS_FILE`, so they survive a restart. In Docker, mount a volume at
+`/usr/src/app/data` to keep them when the container is recreated.
 
 > [!WARNING]
 > Set `WEB_PASSWORD` if the dashboard can be reached from other machines. Use a reverse proxy with HTTPS if you

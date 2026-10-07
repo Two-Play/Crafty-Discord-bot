@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 from core.cogs.auto_stop import AutoStop
 from core.crafty import CraftyAPIError, ServerAction
+from core.flags import FeatureFlags, flag_definitions
 
 
 class TestAutoStop(unittest.IsolatedAsyncioTestCase):
@@ -34,6 +35,20 @@ class TestAutoStop(unittest.IsolatedAsyncioTestCase):
         with self.assertLogs('core.cogs.auto_stop', level='INFO'):
             await self.cog.stop_idle_servers.coro(self.cog)
         self.client.run_action.assert_not_awaited()
+
+    async def test_disabled_by_flag(self):
+        cog = AutoStop(self.client, interval=60, flags=FeatureFlags(flag_definitions(False), None))
+        self.assertFalse(cog.enabled)
+        await cog.stop_idle_servers.coro(cog)
+        self.client.list_servers.assert_not_awaited()
+
+    async def test_enabled_by_flag(self):
+        flags = FeatureFlags(flag_definitions(False), None)
+        flags.set('auto_stop', True)
+        cog = AutoStop(self.client, interval=60, flags=flags)
+        with self.assertLogs('core.cogs.auto_stop', level='INFO'):
+            await cog.stop_idle_servers.coro(cog)
+        self.client.run_action.assert_awaited_once_with('idle', ServerAction.STOP)
 
     async def test_list_error_is_handled(self):
         self.client.list_servers.side_effect = CraftyAPIError('down')
