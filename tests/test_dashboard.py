@@ -1,13 +1,16 @@
 import base64
+import errno
 import math
+import socket
 import unittest
-from unittest.mock import AsyncMock, MagicMock
+from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from aiohttp.test_utils import TestClient, TestServer
 
 from core.config import Settings
 from core.crafty import CraftyAPIError
-from core.web.dashboard import WebDashboard, summarize_server
+from core.web.dashboard import DashboardStartError, WebDashboard, describe_bind_error, summarize_server
 
 SETTINGS = Settings(server_url='https://crafty.local', discord_token='discord', crafty_token='crafty',
                     web_enabled=True)
@@ -112,6 +115,24 @@ class TestDashboard(DashboardTestCase):
                 self.assertIn("script-src 'self'", response.headers['Content-Security-Policy'])
                 self.assertEqual(response.headers['X-Content-Type-Options'], 'nosniff')
 
+    async def test_unexpected_error_returns_500(self):
+        self.bot.crafty.list_servers.side_effect = RuntimeError('boom')
+        with self.assertLogs('core.web.dashboard', level='ERROR'):
+            response = await self.client.get('/api/status')
+        self.assertEqual(response.status, 500)
+        self.assertIn('Internal error', (await response.json())['error'])
+
+    async def test_server_without_id_is_skipped(self):
+        self.bot.crafty.list_servers.return_value = [{'server_name': 'broken'}, {'server_id': 'a'}]
+        data = await (await self.client.get('/api/status')).json()
+        self.assertEqual([server['id'] for server in data['servers']], ['a'])
+
+    async def test_missing_static_file(self):
+        with patch('core.web.dashboard.STATIC_DIR', Path('/nonexistent-crafty-bot-static')), \
+                self.assertLogs('core.web.dashboard', level='ERROR'):
+            response = await self.client.get('/app.js')
+        self.assertEqual(response.status, 500)
+
     async def test_health(self):
         response = await self.client.get('/healthz')
         self.assertEqual(await response.text(), 'ok')
@@ -157,6 +178,32 @@ class TestDashboardLifecycle(unittest.IsolatedAsyncioTestCase):
             await dashboard.cog_unload()
         self.assertIn('127.0.0.1:18765', logs.output[0])
         self.assertIn('no WEB_PASSWORD', logs.output[0])
+
+
+class TestDashboardStartErrors(unittest.IsolatedAsyncioTestCase):
+
+    async def test_port_in_use(self):
+        with socket.socket() as blocker:
+            blocker.bind(('127.0.0.1', 0))
+            blocker.listen()
+            port = blocker.getsockname()[1]
+            dashboard = WebDashboard(make_bot(Settings(**{**SETTINGS.__dict__, 'web_port': port})))
+            with self.assertRaises(DashboardStartError) as cm:
+                await dashboard.cog_load()
+        self.assertIn(f'port {port} is already in use', str(cm.exception))
+        self.assertIsNone(dashboard._runner)  # pylint: disable=protected-access
+
+    def test_messages(self):
+        cases = [
+            (OSError(errno.EACCES, 'denied'), 'above 1023'),
+            (OSError(errno.EADDRNOTAVAIL, 'not available'), 'not an address of this machine'),
+            (socket.gaierror(-2, 'Name or service not known'), 'not an address of this machine'),
+            (OSError("could not bind on any address out of [('10.0.0.1', 80)]"), 'not an address of this machine'),
+            (OSError(errno.EIO, 'io error'), 'io error'),
+        ]
+        for error, expected in cases:
+            with self.subTest(error=error):
+                self.assertIn(expected, describe_bind_error(error, 'nohost', 80))
 
 
 if __name__ == '__main__':
