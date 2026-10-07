@@ -60,6 +60,7 @@ class Settings:  # pylint: disable=too-many-instance-attributes
     auto_stop_interval: int = DEFAULT_AUTO_STOP_INTERVAL
     verify_ssl: bool = False
     log_level: str = DEFAULT_LOG_LEVEL
+    log_file: Optional[str] = None
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> Settings:
@@ -103,4 +104,5 @@ class Settings:  # pylint: disable=too-many-instance-attributes
             auto_stop_interval=auto_stop_interval,
             verify_ssl=_get_bool(env, 'CRAFTY_VERIFY_SSL'),
             log_level=log_level,
+            log_file=_get(env, 'LOG_FILE') or None,
         )
