@@ -3,24 +3,37 @@ Background task that stops servers without players.
 """
 
 import logging
+from typing import Optional
 
 from discord.ext import commands, tasks
 
 from core.crafty import CraftyAPIError, CraftyClient, ServerAction, busy_state, player_count
+from core.flags import FeatureFlags
 
 logger = logging.getLogger(__name__)
 
 
 class AutoStop(commands.Cog):
-    """Periodically stops every running server that has no players online."""
+    """
+    Periodically stops every running server that has no players online.
 
-    def __init__(self, client: CraftyClient, interval: int):
+    The loop always runs, but only does something while the ``auto_stop`` feature flag is on.
+    """
+
+    def __init__(self, client: CraftyClient, interval: int, flags: Optional[FeatureFlags] = None):
         self._client = client
+        self._flags = flags
         self.stop_idle_servers.change_interval(seconds=interval)
+
+    @property
+    def enabled(self) -> bool:
+        """Whether the ``auto_stop`` feature flag is on."""
+        return self._flags is None or self._flags.is_enabled('auto_stop')
 
     async def cog_load(self) -> None:
         self.stop_idle_servers.start()
-        logger.info('Auto stop started, checking every %d seconds', self.stop_idle_servers.seconds)
+        logger.info('Auto stop %s, checking every %d seconds', 'enabled' if self.enabled else 'disabled',
+                    self.stop_idle_servers.seconds)
 
     async def cog_unload(self) -> None:
         self.stop_idle_servers.cancel()
@@ -28,6 +41,9 @@ class AutoStop(commands.Cog):
     @tasks.loop(minutes=30)
     async def stop_idle_servers(self) -> None:
         """Stop running servers without players. Errors are logged and retried next run."""
+        if not self.enabled:
+            logger.debug('Auto stop is disabled by its feature flag, skipping this run')
+            return
         try:
             servers = await self._client.list_servers()
         except CraftyAPIError as exc:

@@ -10,6 +10,7 @@ from aiohttp.test_utils import TestClient, TestServer
 
 from core.config import Settings
 from core.crafty import CraftyAPIError
+from core.flags import FeatureFlags, FlagSaveError, flag_definitions
 from core.web.dashboard import DashboardStartError, WebDashboard, describe_bind_error, summarize_server
 
 SETTINGS = Settings(server_url='https://crafty.local', discord_token='discord', crafty_token='crafty',
@@ -22,6 +23,7 @@ RUNNING_STATS = {'running': True, 'int_ping_results': 'True', 'online': 1, 'max'
 def make_bot(settings=SETTINGS):
     bot = MagicMock()
     bot.settings = settings
+    bot.flags = FeatureFlags(flag_definitions(settings.auto_stop_enabled), None)
     bot.latency = 0.042
     bot.guilds = [object()]
     bot.user = 'CraftyBot#0001'
@@ -133,6 +135,14 @@ class TestDashboard(DashboardTestCase):
             response = await self.client.get('/app.js')
         self.assertEqual(response.status, 500)
 
+    async def test_flags_read_only_without_password(self):
+        data = await (await self.client.get('/api/flags')).json()
+        self.assertFalse(data['editable'])
+        response = await self.client.put('/api/flags/command_stop', json={'enabled': False},
+                                         headers={'X-Crafty-Bot': '1'})
+        self.assertEqual(response.status, 403)
+        self.assertTrue(self.bot.flags.is_enabled('command_stop'))
+
     async def test_health(self):
         response = await self.client.get('/healthz')
         self.assertEqual(await response.text(), 'ok')
@@ -162,6 +172,56 @@ class TestDashboardPassword(DashboardTestCase):
     async def test_correct_password(self):
         response = await self.client.get('/api/status', headers=self.auth('secret'))
         self.assertEqual(response.status, 200)
+
+    async def put_flag(self, name, body, headers=None):
+        headers = {**self.auth('secret'), 'X-Crafty-Bot': '1', **(headers or {})}
+        return await self.client.put(f'/api/flags/{name}', json=body, headers=headers)
+
+    async def test_set_flag(self):
+        with self.assertLogs('core.web.dashboard', level='INFO'):
+            response = await self.put_flag('command_stop', {'enabled': False})
+        self.assertEqual(response.status, 200)
+        data = await response.json()
+        self.assertTrue(data['editable'])
+        self.assertFalse(next(flag for flag in data['flags'] if flag['name'] == 'command_stop')['enabled'])
+        self.assertFalse(self.bot.flags.is_enabled('command_stop'))
+
+    async def test_set_flag_updates_auto_stop_status(self):
+        await (await self.client.get('/api/status', headers=self.auth('secret'))).json()
+        with self.assertLogs('core.web.dashboard', level='INFO'):
+            await self.put_flag('auto_stop', {'enabled': True})
+        data = await (await self.client.get('/api/status', headers=self.auth('secret'))).json()
+        self.assertEqual(data['bot']['auto_stop'], SETTINGS.auto_stop_interval)
+
+    async def test_set_flag_without_csrf_header(self):
+        with self.assertLogs('core.web.dashboard', level='WARNING'):
+            response = await self.client.put('/api/flags/command_stop', json={'enabled': False},
+                                             headers=self.auth('secret'))
+        self.assertEqual(response.status, 400)
+        self.assertTrue(self.bot.flags.is_enabled('command_stop'))
+
+    async def test_set_flag_requires_password(self):
+        response = await self.client.put('/api/flags/command_stop', json={'enabled': False},
+                                         headers={'X-Crafty-Bot': '1'})
+        self.assertEqual(response.status, 401)
+
+    async def test_set_invalid_flag(self):
+        for name, body in (('nope', {'enabled': True}), ('command_stop', {'enabled': 'no'}), ('command_stop', [])):
+            with self.subTest(name=name, body=body), self.assertLogs('core.web.dashboard', level='WARNING'):
+                response = await self.put_flag(name, body)
+                self.assertEqual(response.status, 400)
+
+    async def test_set_flag_invalid_json(self):
+        response = await self.client.put('/api/flags/command_stop', data='{', headers={
+            **self.auth('secret'), 'X-Crafty-Bot': '1', 'Content-Type': 'application/json'})
+        self.assertEqual(response.status, 400)
+
+    async def test_set_flag_save_error(self):
+        with patch.object(self.bot.flags, 'set', side_effect=FlagSaveError('disk full')), \
+                self.assertLogs('core.web.dashboard', level='ERROR'):
+            response = await self.put_flag('command_stop', {'enabled': False})
+        self.assertEqual(response.status, 500)
+        self.assertNotIn('disk full', (await response.json())['error'])
 
     async def test_health_without_password(self):
         response = await self.client.get('/healthz')

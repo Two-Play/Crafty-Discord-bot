@@ -15,7 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY core ./core
 
-RUN useradd --create-home --uid 1000 bot
+RUN useradd --create-home --uid 1000 bot \
+    && mkdir data \
+    && chown bot:bot data
 USER bot
+
+# Feature flags changed in the web dashboard are saved here
+VOLUME ["/usr/src/app/data"]
 
 CMD ["python", "-m", "core"]

@@ -13,6 +13,7 @@ from discord.ext import commands
 
 from core.crafty import (CraftyAPIError, CraftyClient, JsonDict, ServerAction, busy_state, parse_server_id,
                          player_count)
+from core.flags import FeatureDisabled, FeatureFlags
 from core.formatting import format_server_list, format_server_stats
 
 logger = logging.getLogger(__name__)
@@ -51,10 +52,17 @@ def select_backup(backups: List[JsonDict], name: Optional[str]) -> Optional[Json
 class ServerCommands(commands.Cog, name='Servers'):
     """Commands to control the Crafty servers."""
 
-    def __init__(self, client: CraftyClient):
+    def __init__(self, client: CraftyClient, flags: Optional[FeatureFlags] = None):
         self._client = client
+        self._flags = flags
         self._server_cache: List[JsonDict] = []
         self._server_cache_time = 0.0
+
+    def cog_check(self, ctx: commands.Context) -> bool:
+        # Applies to the prefix and the slash version of every command in this cog.
+        if self._flags is not None and not self._flags.is_enabled(f'command_{ctx.command.name}'):
+            raise FeatureDisabled(ctx.command.name)
+        return True
 
     async def cog_before_invoke(self, ctx: commands.Context) -> None:
         # Crafty requests can take longer than the 3 seconds Discord grants to answer an interaction.
