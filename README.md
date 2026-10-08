@@ -68,8 +68,11 @@ server and obtain the user token. You can do this by following these steps:
 
 1. Go to your Crafty Controller server
 2. Click on the gear icon in the top right corner
-3. Click on "add user" and enter a name for your user (for example, "Crafty Bot")
-4. Fill in the required fields, select the desired permissions and click on "Save"
+3. Click on "add user" and enter a name for your user (for example, `crafty_bot`).
+   Crafty only accepts usernames with 3 to 20 lowercase letters, digits or underscores (no spaces).
+4. Fill in the required fields, select the desired permissions and click on "Save".
+   The user must have a role that gives it access to the servers the bot should control
+   (create one with "add role" if needed). Otherwise Crafty returns no servers and `list` stays empty.
 5. Click on the pencil icon next to the user you just created
 6. Click on "API Key" and select the following permissions:
     - COMMANDS
