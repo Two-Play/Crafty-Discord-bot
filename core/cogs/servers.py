@@ -132,6 +132,9 @@ class ServerCommands(commands.Cog, name='Servers'):
     async def list_servers(self, ctx: commands.Context) -> None:
         """List all servers with their IDs."""
         servers = await self._client.list_servers()
+        if not servers:
+            await ctx.reply('No servers found. Make sure the Crafty user has a role with access to your servers.')
+            return
         await ctx.reply(f'Server information:\n{format_server_list(servers)}')
 
     @commands.hybrid_command(name='stats', description='get server stats')

@@ -48,6 +48,11 @@ class TestServerCommands(unittest.IsolatedAsyncioTestCase):
         await self.invoke(self.cog.list_servers)
         self.assertIn('Survival', self.reply_text())
 
+    async def test_list_empty(self):
+        self.client.list_servers.return_value = []
+        await self.invoke(self.cog.list_servers)
+        self.assertIn('No servers found', self.reply_text())
+
     async def test_stats(self):
         self.set_stats(running=False)
         await self.invoke(self.cog.stats, SERVER_ID)
