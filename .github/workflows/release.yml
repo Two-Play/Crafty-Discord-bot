@@ -3,7 +3,7 @@ name: Create release
 on:
   push:
     tags:
-      - *
+      - '*.*.*'
 
 permissions:
   contents: write
@@ -11,14 +11,16 @@ permissions:
 jobs:
   release:
     name: Release pushed tag
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${GITHUB_REF##*/}
+          TAG: ${{ github.ref_name }}
         run: |
-          gh release create "$tag" \
-              --repo="$GITHUB_REPOSITORY" \
-              --title="${GITHUB_REPOSITORY#*/} ${tag#v}" \
-              --generate-notes
+          PRERELEASE=""
+          case "$TAG" in *-*) PRERELEASE="--prerelease" ;; esac
+          gh release create "$TAG" \
+            --repo="$GITHUB_REPOSITORY" \
+            --title="${GITHUB_REPOSITORY#*/} ${TAG#v}" \
+            --generate-notes $PRERELEASE

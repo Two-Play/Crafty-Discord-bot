@@ -23,7 +23,9 @@ flake8 core tests                        # config in .flake8 (max line length 12
 pylint core                              # config in pyproject.toml
 ```
 
-CI (`.github/workflows/pylint-tests.yml`) runs flake8 and pylint with `--exit-zero`, so only test failures fail the build. The code is currently clean under both linters, so keep it that way. Coverage is uploaded to Codacy. Pushing a tag triggers the release and Docker publish workflows (image `twoplay/craftybot`).
+CI (`.github/workflows/pylint-tests.yml`) runs flake8 and pylint with `--exit-zero`, so only test failures fail the build. The code is currently clean under both linters, so keep it that way. Coverage is uploaded to Codacy. Its `tests` job only runs when code changed (a `changes` job with `dorny/paths-filter`); a skipped job still satisfies the required `tests` check on `master`. Add new code or config paths to that filter. Docker images (`twoplay/craftybot`) are built on pushes to `master` (`latest`) and `develop` (`beta`) only when `core/`, `requirements.txt`, `Dockerfile` or `.dockerignore` changed, and always for version tags: `1.2.3` publishes `latest` + `1.2.3` and creates a release, `1.2.3-beta` publishes `beta` + `1.2.3-beta` and a pre-release.
+
+`master` is protected: changes only go in through a pull request whose `tests` check passed and that is up to date with `master`; force pushes and deletion are blocked.
 
 Branching: work on feature branches created from `develop`, then merge them back into `develop`. `master` is the release branch.
 

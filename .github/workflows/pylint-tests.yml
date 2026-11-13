@@ -1,11 +1,42 @@
-name: Python Lintingon and tests
+name: Lint and tests
+
 on:
   push:
     branches: [master, develop]
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  # Finds out whether code changed. The tests job is then skipped for README/wiki/workflow-only changes,
+  # and a skipped job still counts as passed for the required status check of master.
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dorny/paths-filter@v3.0.2
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'core/**'
+              - 'tests/**'
+              - 'requirements*.txt'
+              - 'pyproject.toml'
+              - '.flake8'
+              - '.github/workflows/pylint-tests.yml'
+
+  tests:
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4.2.2
@@ -13,6 +44,8 @@ jobs:
         uses: actions/setup-python@v5.3.0
         with:
           python-version: "3.10"
+          cache: pip
+          cache-dependency-path: requirements*.txt
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -22,21 +55,15 @@ jobs:
           flake8 core tests --count --select=E9,F63,F7,F82 --show-source --statistics --exit-zero
           flake8 core tests --count --statistics --exit-zero
       - name: Lint with Pylint
-        run: |
-          pylint core --exit-zero
-
+        run: pylint core --exit-zero
       - name: Run tests
-        run: |
-          coverage run -m unittest
+        run: coverage run -m unittest
       - name: Generate coverage report
-        run: |
-          coverage xml
+        run: coverage xml
       - name: Upload coverage report to Codacy
+        # Secrets are not available in pull requests from forks
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         uses: codacy/codacy-coverage-reporter-action@v1.3.0
         with:
           project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
-          # or
-          # api-token: ${{ secrets.CODACY_API_TOKEN }}
           coverage-reports: coverage.xml
-          # or a comma-separated list for multiple reports
-          # coverage-reports: coverage.xml, coverage2.xml
