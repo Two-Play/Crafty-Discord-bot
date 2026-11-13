@@ -4,16 +4,21 @@ Configuration of the bot, loaded from environment variables.
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass, field
-from typing import Mapping, Optional
+from pathlib import Path
+from typing import Mapping, Optional, Tuple
 
 DEFAULT_AUTO_STOP_INTERVAL = 1800  # seconds (30 minutes)
 DEFAULT_LOG_LEVEL = 'INFO'
 DEFAULT_WEB_HOST = '127.0.0.1'
 DEFAULT_WEB_PORT = 8080
 DEFAULT_FLAGS_FILE = 'data/feature_flags.json'
+LOG_LEVELS = ('DEBUG', 'INFO', 'WARNING', 'ERROR')
+
+# Relative paths in the settings are resolved against the project directory (where .env lives),
+# not the working directory, so the bot finds its files wherever it is started from.
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 _TRUE_VALUES = {'1', 'true', 'yes', 'on'}
 
@@ -29,6 +34,15 @@ def _get(env: Mapping[str, str], *names: str) -> str:
         if value:
             return value
     return ''
+
+
+def _resolve_path(value: str) -> str:
+    path = Path(value).expanduser()
+    return str(path if path.is_absolute() else BASE_DIR / path)
+
+
+def _get_list(env: Mapping[str, str], name: str) -> Tuple[str, ...]:
+    return tuple(item.strip().lower() for item in _get(env, name).split(',') if item.strip())
 
 
 def _get_bool(env: Mapping[str, str], name: str) -> bool:
@@ -68,7 +82,8 @@ class Settings:  # pylint: disable=too-many-instance-attributes
     web_host: str = DEFAULT_WEB_HOST
     web_port: int = DEFAULT_WEB_PORT
     web_password: str = field(default='', repr=False)
-    flags_file: str = DEFAULT_FLAGS_FILE
+    web_allowed_hosts: Tuple[str, ...] = ()
+    flags_file: str = str(BASE_DIR / DEFAULT_FLAGS_FILE)
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> Settings:
@@ -98,8 +113,8 @@ class Settings:  # pylint: disable=too-many-instance-attributes
             raise ConfigError('AUTO_STOP_SLEEP_TIME must be greater than 0')
 
         log_level = (_get(env, 'LOG_LEVEL') or DEFAULT_LOG_LEVEL).upper()
-        if not isinstance(logging.getLevelName(log_level), int):
-            raise ConfigError(f'LOG_LEVEL {log_level!r} is not a valid log level')
+        if log_level not in LOG_LEVELS:
+            raise ConfigError(f"LOG_LEVEL must be one of {', '.join(LOG_LEVELS)}, got {log_level!r}")
 
         web_port = _get_int(env, 'WEB_PORT', DEFAULT_WEB_PORT)
         if not 0 < web_port < 65536:
@@ -116,10 +131,11 @@ class Settings:  # pylint: disable=too-many-instance-attributes
             auto_stop_interval=auto_stop_interval,
             verify_ssl=_get_bool(env, 'CRAFTY_VERIFY_SSL'),
             log_level=log_level,
-            log_file=_get(env, 'LOG_FILE') or None,
+            log_file=_resolve_path(_get(env, 'LOG_FILE')) if _get(env, 'LOG_FILE') else None,
             web_enabled=_get_bool(env, 'WEB_ENABLED'),
             web_host=_get(env, 'WEB_HOST') or DEFAULT_WEB_HOST,
             web_port=web_port,
             web_password=_get(env, 'WEB_PASSWORD'),
-            flags_file=_get(env, 'FLAGS_FILE') or DEFAULT_FLAGS_FILE,
+            web_allowed_hosts=_get_list(env, 'WEB_ALLOWED_HOSTS'),
+            flags_file=_resolve_path(_get(env, 'FLAGS_FILE') or DEFAULT_FLAGS_FILE),
         )

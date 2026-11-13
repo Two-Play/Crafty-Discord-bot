@@ -90,6 +90,14 @@ def busy_state(stats: JsonDict) -> Optional[str]:
     return None
 
 
+def server_version(stats: JsonDict) -> Optional[str]:
+    """Return the game version of a running server, or ``None`` (Crafty sends ``"False"`` when unknown)."""
+    version = stats.get('version')
+    if not stats.get('running') or not version or version == 'False':
+        return None
+    return str(version)
+
+
 def _shorten(text: str, length: int) -> str:
     return text if len(text) <= length else text[:length] + '...'
 
@@ -122,7 +130,14 @@ class CraftyClient:
         """Close the underlying HTTP session."""
         self._session.close()
 
-    def _request(self, method: str, path: str, payload: Optional[JsonDict] = None) -> JsonDict:
+    def _request(self, method: str, path: str, payload: Optional[JsonDict] = None, *,
+                 envelope: bool = True) -> Any:
+        """
+        Send a request and return the decoded body.
+
+        With ``envelope`` the body must be ``{"status": "ok", ...}``. Without it (the backup
+        endpoints answer with the bare data) only an explicit ``"status": "error"`` fails.
+        """
         start = time.monotonic()
         try:
             response = self._session.request(method, self._base_url + path, json=payload,
@@ -138,30 +153,22 @@ class CraftyClient:
             body = response.json()
         except ValueError as exc:
             raise CraftyAPIError(f'{method} {path} returned invalid JSON') from exc
-        if not isinstance(body, dict) or body.get('status') != 'ok':
+        status = body.get('status') if isinstance(body, dict) else None
+        if (envelope and status != 'ok') or status == 'error':
             raise CraftyAPIError(f'{method} {path} returned an error: '
                                  f'{_shorten(repr(body), MAX_LOGGED_BODY_LENGTH)}')
         return body
 
-    def _request_raw(self, method: str, path: str) -> Any:
-        """Like ``_request`` for endpoints that answer without the ``{"status", "data"}`` envelope."""
-        try:
-            response = self._session.request(method, self._base_url + path, timeout=self._timeout,
-                                             verify=self._verify_ssl)
-        except requests.RequestException as exc:
-            raise CraftyAPIError(f'{method} {path} failed: {exc}') from exc
-        logger.debug('%s %s -> HTTP %d', method, path, response.status_code)
-        try:
-            body = response.json()
-        except ValueError as exc:
-            raise CraftyAPIError(f'{method} {path} returned invalid JSON') from exc
-        if not response.ok or (isinstance(body, dict) and body.get('status') == 'error'):
-            raise CraftyAPIError(f'{method} {path} returned HTTP {response.status_code}: '
-                                 f'{_shorten(repr(body), MAX_LOGGED_BODY_LENGTH)}')
-        return body
+    async def _call(self, method: str, path: str, payload: Optional[JsonDict] = None, *,
+                    envelope: bool = True) -> Any:
+        return await asyncio.to_thread(self._request, method, path, payload, envelope=envelope)
 
-    async def _call(self, method: str, path: str, payload: Optional[JsonDict] = None) -> JsonDict:
-        return await asyncio.to_thread(self._request, method, path, payload)
+    async def _get_data(self, path: str) -> Any:
+        """GET an endpoint and return its ``data`` field."""
+        body = await self._call('GET', path)
+        if 'data' not in body:
+            raise CraftyAPIError(f'GET {path} returned no data: {_shorten(repr(body), MAX_LOGGED_BODY_LENGTH)}')
+        return body['data']
 
     async def login(self, username: str, password: str) -> None:
         """Log in with username and password and use the returned token from now on."""
@@ -175,11 +182,17 @@ class CraftyClient:
 
     async def list_servers(self) -> List[JsonDict]:
         """Return all servers visible to the API user."""
-        return (await self._call('GET', SERVERS_ENDPOINT))['data']
+        servers = await self._get_data(SERVERS_ENDPOINT)
+        if not isinstance(servers, list):
+            raise CraftyAPIError(f'Unexpected server list: {_shorten(repr(servers), MAX_LOGGED_BODY_LENGTH)}')
+        return servers
 
     async def get_stats(self, server_id: str) -> JsonDict:
         """Return the current statistics (running state, players, CPU, RAM...) of a server."""
-        return (await self._call('GET', f'{SERVERS_ENDPOINT}/{server_id}/stats'))['data']
+        stats = await self._get_data(f'{SERVERS_ENDPOINT}/{server_id}/stats')
+        if not isinstance(stats, dict):
+            raise CraftyAPIError(f'Unexpected stats: {_shorten(repr(stats), MAX_LOGGED_BODY_LENGTH)}')
+        return stats
 
     async def run_action(self, server_id: str, action: ServerAction, action_id: Optional[str] = None) -> None:
         """Execute an action (start, stop, restart, backup) on a server."""
@@ -195,7 +208,7 @@ class CraftyClient:
         Needs the BACKUP permission. Crafty returns them as a dict keyed by backup ID and,
         unlike the other endpoints, without the ``{"status", "data"}`` envelope.
         """
-        body = await asyncio.to_thread(self._request_raw, 'GET', f'{SERVERS_ENDPOINT}/{server_id}/backups')
+        body = await self._call('GET', f'{SERVERS_ENDPOINT}/{server_id}/backups', envelope=False)
         if isinstance(body, dict) and body.get('status') == 'ok':
             body = body.get('data')
         if isinstance(body, dict):

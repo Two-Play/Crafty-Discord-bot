@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 import requests
 
 from core.crafty import (CraftyAPIError, CraftyClient, ServerAction, busy_state, parse_server_id, player_count,
-                         player_names)
+                         player_names, server_version)
 
 SERVER_ID = 'ff231030-910c-4aaa-bd83-50e03aedab1c'
 
@@ -52,6 +52,11 @@ class TestStatsHelpers(unittest.TestCase):
         self.assertEqual(player_names({'players': 'False'}), [])
         self.assertEqual(player_names({'players': 'not a list ['}), [])
         self.assertEqual(player_names({}), [])
+
+    def test_server_version(self):
+        self.assertEqual(server_version({'running': True, 'version': '1.21.4'}), '1.21.4')
+        self.assertIsNone(server_version({'running': True, 'version': 'False'}))
+        self.assertIsNone(server_version({'running': False, 'version': '1.21.4'}))
 
     def test_busy_state(self):
         self.assertEqual(busy_state({'waiting_start': True}), 'starting')
@@ -120,6 +125,18 @@ class TestCraftyClient(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(CraftyAPIError):
             await self.client.run_action(SERVER_ID, ServerAction.START)
 
+    async def test_missing_data_raises_api_error(self):
+        self.session.request.return_value = make_response(body={'status': 'ok'})
+        with self.assertRaises(CraftyAPIError):
+            await self.client.list_servers()
+        with self.assertRaises(CraftyAPIError):
+            await self.client.get_stats(SERVER_ID)
+
+    async def test_wrong_data_type_raises_api_error(self):
+        self.session.request.return_value = make_response(body={'status': 'ok', 'data': 'nope'})
+        with self.assertRaises(CraftyAPIError):
+            await self.client.list_servers()
+
     async def test_long_error_body_is_shortened(self):
         self.session.request.return_value = make_response(body={'status': 'error', 'error': 'x' * 1000})
         with self.assertRaises(CraftyAPIError) as cm:
@@ -154,6 +171,14 @@ class TestCraftyClientBackups(unittest.IsolatedAsyncioTestCase):
     async def test_list_backups_with_envelope(self):
         self.session.request.return_value = make_response(body={'status': 'ok', 'data': [{'backup_id': 'b1'}]})
         self.assertEqual(await self.client.list_backups(SERVER_ID), [{'backup_id': 'b1'}])
+
+    async def test_list_backups_http_error_without_json(self):
+        response = make_response(502)
+        response.json.side_effect = ValueError
+        self.session.request.return_value = response
+        with self.assertRaises(CraftyAPIError) as cm:
+            await self.client.list_backups(SERVER_ID)
+        self.assertIn('HTTP 502', str(cm.exception))
 
     async def test_list_backups_not_authorized(self):
         self.session.request.return_value = make_response(400, {'status': 'error', 'error': 'NOT_AUTHORIZED'})

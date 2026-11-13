@@ -2,22 +2,43 @@
 Functions to format Crafty API data as Discord message text.
 """
 
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, List
 
-from core.crafty import busy_state, player_count, player_names
+from core.crafty import busy_state, player_count, player_names, server_version
+
+DISCORD_MESSAGE_LIMIT = 2000
+MAX_LISTED_PLAYERS = 20
 
 
-def format_server_list(servers: Iterable[Dict[str, Any]]) -> str:
+def split_message(parts: Iterable[str], limit: int = DISCORD_MESSAGE_LIMIT) -> List[str]:
     """
-    Format a list of servers (ID, name, IP and port) as code blocks.
+    Join the parts into as few messages as possible that each fit Discord's length limit.
+    A part is never split, so code blocks stay intact; parts longer than the limit are cut.
     """
-    return ''.join(
+    messages: List[str] = []
+    current = ''
+    for part in parts:
+        part = part[:limit]
+        if current and len(current) + len(part) > limit:
+            messages.append(current)
+            current = ''
+        current += part
+    if current:
+        messages.append(current)
+    return messages
+
+
+def format_server_list(servers: Iterable[Dict[str, Any]]) -> List[str]:
+    """
+    Format a list of servers (ID, name, IP and port) as one code block per server.
+    """
+    return [
         f"```\nID: {server.get('server_id', '-')}\n"
         f"Server: {server.get('server_name', '')}\n"
         f"  IP: {server.get('server_ip', 'unknown')}\n"
         f"  Port: {server.get('server_port', 'unknown')}\n```\n"
         for server in servers
-    )
+    ]
 
 
 def format_memory(value: Any) -> str:
@@ -41,6 +62,8 @@ def format_players(stats: Dict[str, Any]) -> str:
     max_players = stats.get('max')
     text = f'{count}/{max_players}' if max_players else str(count)
     names = player_names(stats)
+    if len(names) > MAX_LISTED_PLAYERS:
+        names = names[:MAX_LISTED_PLAYERS] + [f'and {len(names) - MAX_LISTED_PLAYERS} more']
     if names:
         text += f" ({', '.join(names)})"
     return text
@@ -62,12 +85,9 @@ def format_server_stats(stats: Dict[str, Any]) -> str:
         lines.append('Status: crashed')
 
     if running:
-        version = stats.get('version')
-        if not version or version == 'False':
-            version = 'unknown'
         lines += [
             f'Players: {format_players(stats)}',
-            f'Version: {version}',
+            f"Version: {server_version(stats) or 'unknown'}",
             f"CPU: {stats.get('cpu', '?')}%",
             f"RAM: {format_memory(stats.get('mem'))} ({stats.get('mem_percent', '?')}%)",
         ]

@@ -23,7 +23,6 @@ LOG_FILE_MAX_BYTES = 5 * 1024 * 1024
 LOG_FILE_BACKUP_COUNT = 3
 
 LOG_BUFFER_SIZE = 1000
-LEVELS = ('DEBUG', 'INFO', 'WARNING', 'ERROR')
 
 APP_LOGGER = 'core'
 
@@ -55,6 +54,12 @@ class LogBuffer(logging.Handler):
             self.handleError(record)
             return
         self._entries.append(entry)
+
+    @property
+    def last_id(self) -> int:
+        """ID of the newest entry, 0 if there is none. Starts again at 1 when the bot restarts."""
+        with self.lock:
+            return self._entries[-1]['id'] if self._entries else 0
 
     def entries(self, after: int = 0, limit: int = LOG_BUFFER_SIZE) -> List[Dict[str, Any]]:
         """Return the entries with an ID greater than ``after``, at most the last ``limit`` ones."""
