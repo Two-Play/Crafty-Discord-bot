@@ -44,11 +44,9 @@ def password_matches(request: web.Request, password: str) -> bool:
 
 
 def host_allowed(host: str, allowed_hosts: Iterable[str]) -> bool:
-    """Check whether the Host header names this machine.
-
-    Allowed are IP addresses, ``localhost`` and ``WEB_ALLOWED_HOSTS``. Other names point to DNS
-    rebinding, where a website the user visits makes its own domain resolve to the dashboard to read it.
-    """
+    """Check whether the Host header names this machine (an IP address, localhost or WEB_ALLOWED_HOSTS)."""
+    # Other names point to DNS rebinding, where a website the user visits makes its own domain
+    # resolve to the dashboard to read it.
     hostname = host.lower()
     if hostname.startswith('['):  # [::1]:8080
         hostname = hostname[1:].partition(']')[0]
