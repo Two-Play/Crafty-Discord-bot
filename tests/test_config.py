@@ -1,6 +1,6 @@
 import unittest
 
-from core.config import DEFAULT_AUTO_STOP_INTERVAL, ConfigError, Settings
+from core.config import BASE_DIR, DEFAULT_AUTO_STOP_INTERVAL, ConfigError, Settings
 
 REQUIRED = {'SERVER_URL': 'https://crafty.local:8443/', 'DISCORD_TOKEN': 'discord-secret',
             'CRAFTY_TOKEN': 'crafty-secret'}
@@ -19,7 +19,7 @@ class TestSettingsFromEnv(unittest.TestCase):
         self.assertFalse(settings.verify_ssl)
         self.assertEqual(settings.log_level, 'INFO')
         self.assertIsNone(settings.log_file)
-        self.assertEqual(settings.flags_file, 'data/feature_flags.json')
+        self.assertEqual(settings.flags_file, str(BASE_DIR / 'data' / 'feature_flags.json'))
 
     def test_optional_vars(self):
         settings = Settings.from_env({**REQUIRED, 'GUILD_ID': '42', 'ENABLE_AUTO_STOP_SERVER': 'true',
@@ -30,7 +30,7 @@ class TestSettingsFromEnv(unittest.TestCase):
         self.assertEqual(settings.auto_stop_interval, 60)
         self.assertTrue(settings.verify_ssl)
         self.assertEqual(settings.log_level, 'DEBUG')
-        self.assertEqual(settings.log_file, 'logs/bot.log')
+        self.assertEqual(settings.log_file, str(BASE_DIR / 'logs' / 'bot.log'))
 
     def test_missing_all_vars(self):
         with self.assertRaises(ConfigError):
@@ -64,8 +64,8 @@ class TestSettingsFromEnv(unittest.TestCase):
 
     def test_invalid_values(self):
         for name, value in (('GUILD_ID', 'abc'), ('AUTO_STOP_SLEEP_TIME', '0'),
-                            ('AUTO_STOP_SLEEP_TIME', 'x'), ('LOG_LEVEL', 'LOUD'), ('WEB_PORT', '0'),
-                            ('WEB_PORT', '70000')):
+                            ('AUTO_STOP_SLEEP_TIME', 'x'), ('LOG_LEVEL', 'LOUD'), ('LOG_LEVEL', 'CRITICAL'),
+                            ('WEB_PORT', '0'), ('WEB_PORT', '70000')):
             with self.subTest(name=name, value=value), self.assertRaises(ConfigError):
                 Settings.from_env({**REQUIRED, name: value})
 
@@ -82,6 +82,14 @@ class TestSettingsFromEnv(unittest.TestCase):
                                       'WEB_PASSWORD': 'pw'})
         self.assertTrue(settings.web_enabled)
         self.assertEqual((settings.web_host, settings.web_port, settings.web_password), ('0.0.0.0', 9000, 'pw'))
+
+    def test_absolute_paths_are_kept(self):
+        settings = Settings.from_env({**REQUIRED, 'FLAGS_FILE': '/var/lib/bot/flags.json'})
+        self.assertEqual(settings.flags_file, '/var/lib/bot/flags.json')
+
+    def test_allowed_hosts(self):
+        settings = Settings.from_env({**REQUIRED, 'WEB_ALLOWED_HOSTS': 'Bot.example.com, nas.local ,'})
+        self.assertEqual(settings.web_allowed_hosts, ('bot.example.com', 'nas.local'))
 
 
 if __name__ == '__main__':

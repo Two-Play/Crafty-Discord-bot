@@ -6,27 +6,20 @@ Only loaded when ``WEB_ENABLED=true``.
 
 from __future__ import annotations
 
-import asyncio
-import base64
-import binascii
 import errno
-import hmac
 import logging
-import math
 import socket
-import time
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 from aiohttp import web
 from discord.ext import commands
 
-from core import __version__
-from core.crafty import CraftyAPIError, JsonDict, busy_state, player_count, player_names
+from core.config import LOG_LEVELS
 from core.flags import FlagError, FlagSaveError
-from core.formatting import format_memory
-from core.log import LEVELS, LOG_BUFFER, get_log_level, set_log_level
+from core.log import LOG_BUFFER, get_log_level, set_log_level
+from core.web.security import CSRF_HEADER, Handler, security_middleware
+from core.web.status import StatusCollector
 
 if TYPE_CHECKING:
     from core.bot import CraftyBot
@@ -34,25 +27,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parent / 'static'
-SNAPSHOT_CACHE_TTL = 15  # seconds, so page refreshes don't hammer Crafty
 STATIC_FILES = {
     '/': ('index.html', 'text/html'),
     '/app.js': ('app.js', 'text/javascript'),
     '/app.css': ('app.css', 'text/css'),
 }
-# Sent by app.js on every write. Browsers only allow custom headers on cross-origin requests after a
-# CORS preflight, which this server never answers, so other sites can't change flags (CSRF).
-CSRF_HEADER = 'X-Crafty-Bot'
 MAX_LOG_ENTRIES = 500  # per request
-SECURITY_HEADERS = {
-    'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; "
-                               "img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'none'",
-    'X-Content-Type-Options': 'nosniff',
-    'Referrer-Policy': 'no-referrer',
-    'Cache-Control': 'no-store',
-}
-
-Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 
 
 class DashboardStartError(Exception):
@@ -72,43 +52,18 @@ def describe_bind_error(exc: OSError, host: str, port: int) -> str:
     return str(exc)
 
 
-def summarize_server(server: JsonDict, stats: Optional[JsonDict], error: Optional[str] = None) -> Dict[str, Any]:
-    """Reduce a server and its stats to what the dashboard shows."""
-    stats = stats or {}
-    running = bool(stats.get('running'))
-    version = stats.get('version')
-    return {
-        'id': server.get('server_id'),
-        'name': server.get('server_name') or server.get('server_id'),
-        'type': server.get('type'),
-        'address': f"{server['server_ip']}:{server.get('server_port', '?')}" if server.get('server_ip') else None,
-        'running': running,
-        'state': busy_state(stats) or ('crashed' if stats.get('crashed') else None),
-        'players': player_count(stats) if running else None,
-        'max_players': stats.get('max') or None,
-        'player_names': player_names(stats) if running else [],
-        'version': version if running and version and version != 'False' else None,
-        'cpu': stats.get('cpu') if running else None,
-        'memory': format_memory(stats.get('mem')) if running else None,
-        'memory_percent': stats.get('mem_percent') if running else None,
-        'error': error,
-    }
-
-
 class WebDashboard(commands.Cog):
     """Runs the web server of the dashboard while the cog is loaded."""
 
     def __init__(self, bot: CraftyBot):
         self.bot = bot
-        self._started = time.monotonic()
+        self.status = StatusCollector(bot)
         self._runner: Optional[web.AppRunner] = None
-        self._snapshot: Optional[Dict[str, Any]] = None
-        self._snapshot_time = 0.0
-        self._snapshot_lock = asyncio.Lock()
+        self._static_cache: Dict[str, bytes] = {}
         self.app = self._create_app()
 
     def _create_app(self) -> web.Application:
-        app = web.Application(middlewares=[self._security_middleware])
+        app = web.Application(middlewares=[security_middleware(self.bot.settings)])
         app.router.add_get('/healthz', self._health)
         app.router.add_get('/api/status', self._status)
         app.router.add_get('/api/flags', self._get_flags)
@@ -147,40 +102,16 @@ class WebDashboard(commands.Cog):
             self._runner = None
             logger.info('Web dashboard stopped')
 
-    @web.middleware
-    async def _security_middleware(self, request: web.Request, handler: Handler) -> web.StreamResponse:
-        if request.path != '/healthz' and not self._authorized(request):
-            logger.debug('Unauthorized dashboard request from %s', request.remote)
-            response: web.StreamResponse = web.Response(
-                status=401, text='Unauthorized', headers={'WWW-Authenticate': 'Basic realm="Crafty Bot"'})
-        else:
-            response = await handler(request)
-        response.headers.update(SECURITY_HEADERS)
-        return response
-
-    def _authorized(self, request: web.Request) -> bool:
-        """Check the HTTP basic auth password (the user name is ignored) if one is configured."""
-        expected = self.bot.settings.web_password
-        if not expected:
-            return True
-        scheme, _, encoded = request.headers.get('Authorization', '').partition(' ')
-        if scheme.lower() != 'basic':
-            return False
-        try:
-            credentials = base64.b64decode(encoded, validate=True).decode('utf-8')
-        except (binascii.Error, UnicodeDecodeError):
-            return False
-        password = credentials.partition(':')[2]
-        return hmac.compare_digest(password.encode('utf-8'), expected.encode('utf-8'))
-
-    @staticmethod
-    def _static_handler(file_name: str, content_type: str) -> Handler:
+    def _static_handler(self, file_name: str, content_type: str) -> Handler:
         async def handler(_request: web.Request) -> web.StreamResponse:
-            try:
-                body = (STATIC_DIR / file_name).read_bytes()
-            except OSError as exc:
-                logger.error('Dashboard file %s cannot be read: %s', file_name, exc)
-                return web.Response(status=500, text='Dashboard files are missing, check the bot logs.')
+            body = self._static_cache.get(file_name)
+            if body is None:
+                try:
+                    body = (STATIC_DIR / file_name).read_bytes()
+                except OSError as exc:
+                    logger.error('Dashboard file %s cannot be read: %s', file_name, exc)
+                    return web.Response(status=500, text='Dashboard files are missing, check the bot logs.')
+                self._static_cache[file_name] = body
             return web.Response(body=body, content_type=content_type, charset='utf-8')
         return handler
 
@@ -190,7 +121,7 @@ class WebDashboard(commands.Cog):
 
     async def _status(self, _request: web.Request) -> web.StreamResponse:
         try:
-            return web.json_response(await self.snapshot())
+            return web.json_response(await self.status.snapshot())
         except Exception:  # pylint: disable=broad-exception-caught
             logger.exception('Unexpected error while collecting the dashboard status')
             return web.json_response({'error': 'Internal error, check the bot logs.'}, status=500)
@@ -241,7 +172,7 @@ class WebDashboard(commands.Cog):
             return web.json_response({'error': str(exc)}, status=400)
         logger.info('Feature flag %s %s from the dashboard (%s)', name, 'enabled' if enabled else 'disabled',
                     request.remote)
-        self._snapshot = None  # the bot status shows the auto stop flag
+        self.status.invalidate()  # the bot status shows the auto stop flag
         return self._flags_response()
 
     async def _get_logs(self, request: web.Request) -> web.StreamResponse:
@@ -251,8 +182,10 @@ class WebDashboard(commands.Cog):
             return web.json_response({'error': 'after must be a number.'}, status=400)
         return web.json_response({
             'entries': LOG_BUFFER.entries(after, MAX_LOG_ENTRIES),
+            # Lower than the client's last ID after a restart of the bot, so it starts over.
+            'last_id': LOG_BUFFER.last_id,
             'level': get_log_level(),
-            'levels': list(LEVELS),
+            'levels': list(LOG_LEVELS),
             'editable': self.editable,
         })
 
@@ -262,63 +195,11 @@ class WebDashboard(commands.Cog):
             return body
 
         level = str(body.get('level', '')).upper()
-        if level not in LEVELS:
-            return web.json_response({'error': f"Log level must be one of {', '.join(LEVELS)}."}, status=400)
+        if level not in LOG_LEVELS:
+            return web.json_response({'error': f"Log level must be one of {', '.join(LOG_LEVELS)}."}, status=400)
         previous = get_log_level()
         set_log_level(level)
         # WARNING, so the change is visible whatever the new level is.
         logger.warning('Log level changed from %s to %s in the dashboard (%s), until the next restart',
                        previous, level, request.remote)
         return web.json_response({'level': get_log_level()})
-
-    async def snapshot(self) -> Dict[str, Any]:
-        """Return the current status, cached for a few seconds."""
-        async with self._snapshot_lock:
-            now = time.monotonic()
-            if self._snapshot is None or now - self._snapshot_time >= SNAPSHOT_CACHE_TTL:
-                self._snapshot = await self._collect()
-                self._snapshot_time = now
-            return self._snapshot
-
-    async def _collect(self) -> Dict[str, Any]:
-        servers: List[Dict[str, Any]] = []
-        error = None
-        try:
-            server_list = await self.bot.crafty.list_servers()
-        except CraftyAPIError as exc:
-            logger.warning('Dashboard could not load the server list: %s', exc)
-            error = 'Crafty Controller is not reachable. Check the bot logs for details.'
-        else:
-            server_list = [server for server in server_list if server.get('server_id')]
-            results = await asyncio.gather(*(self.bot.crafty.get_stats(server['server_id'])
-                                             for server in server_list), return_exceptions=True)
-            for server, result in zip(server_list, results):
-                if isinstance(result, CraftyAPIError):
-                    logger.warning('Dashboard could not load the stats of %s: %s', server.get('server_id'), result)
-                    servers.append(summarize_server(server, None, 'Stats not available'))
-                elif isinstance(result, BaseException):
-                    logger.error('Unexpected error while loading the stats of %s', server.get('server_id'),
-                                 exc_info=result)
-                    servers.append(summarize_server(server, None, 'Stats not available'))
-                else:
-                    servers.append(summarize_server(server, result))
-
-        return {
-            'bot': self._bot_status(),
-            'servers': servers,
-            'error': error,
-            'updated': datetime.now(timezone.utc).isoformat(timespec='seconds'),
-        }
-
-    def _bot_status(self) -> Dict[str, Any]:
-        latency = self.bot.latency
-        settings = self.bot.settings
-        return {
-            'connected': self.bot.is_ready() and not self.bot.is_closed(),
-            'user': str(self.bot.user) if self.bot.user else None,
-            'version': __version__,
-            'latency_ms': round(latency * 1000) if math.isfinite(latency) else None,
-            'guilds': len(self.bot.guilds),
-            'uptime_seconds': round(time.monotonic() - self._started),
-            'auto_stop': settings.auto_stop_interval if self.bot.flags.is_enabled('auto_stop') else None,
-        }

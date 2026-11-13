@@ -165,18 +165,48 @@ class TestServerCommands(unittest.IsolatedAsyncioTestCase):
     async def test_backup_is_owner_only(self):
         self.assertTrue(self.cog.backup.checks)
 
+    @staticmethod
+    def interaction(server_id, owner=True):
+        interaction = MagicMock()
+        interaction.namespace.server_id = server_id
+        interaction.client.is_owner = AsyncMock(return_value=owner)
+        return interaction
+
+    async def test_backup_autocomplete_hidden_from_non_owners(self):
+        self.set_backups({'backup_id': 'b1', 'backup_name': 'Weekly'})
+        self.assertEqual(await self.cog.backup_autocomplete(self.interaction(SERVER_ID, owner=False), ''), [])
+        self.client.list_backups.assert_not_awaited()
+
+    async def test_backup_autocomplete_uses_cache(self):
+        self.set_backups({'backup_id': 'b1', 'backup_name': 'Weekly'})
+        await self.cog.backup_autocomplete(self.interaction(SERVER_ID), 'w')
+        await self.cog.backup_autocomplete(self.interaction(SERVER_ID), 'we')
+        self.client.list_backups.assert_awaited_once()
+
+    async def test_autocomplete_names_are_limited_to_100_characters(self):
+        self.client.list_servers.return_value = [{'server_id': 'a', 'server_name': 'x' * 150}]
+        choices = await self.cog.server_autocomplete(MagicMock(), '')
+        self.assertEqual(len(choices[0].name), 100)
+
+    async def test_list_is_split_into_several_messages(self):
+        self.client.list_servers.return_value = [
+            {'server_id': f'{n:036d}', 'server_name': f'Server {n}', 'server_ip': '10.0.0.1', 'server_port': 25565}
+            for n in range(40)]
+        self.ctx.send = AsyncMock()
+        await self.invoke(self.cog.list_servers)
+        self.ctx.reply.assert_awaited_once()
+        self.assertGreaterEqual(self.ctx.send.await_count, 1)
+        sent = [self.ctx.reply.call_args.args[0]] + [call.args[0] for call in self.ctx.send.call_args_list]
+        self.assertTrue(all(len(message) <= 2000 for message in sent))
+
     async def test_backup_autocomplete(self):
         self.set_backups({'backup_id': 'b1', 'backup_name': 'Weekly'}, {'backup_id': 'b2', 'backup_name': 'Daily'})
-        interaction = MagicMock()
-        interaction.namespace.server_id = SERVER_ID
-        choices = await self.cog.backup_autocomplete(interaction, 'we')
-        self.assertEqual([c.value for c in choices], ['Weekly'])
+        choices = await self.cog.backup_autocomplete(self.interaction(SERVER_ID), 'we')
+        self.assertEqual([(c.name, c.value) for c in choices], [('Weekly', 'b1')])
 
     async def test_backup_autocomplete_without_server(self):
         self.set_backups({'backup_id': 'b1'})
-        interaction = MagicMock()
-        interaction.namespace.server_id = None
-        self.assertEqual(await self.cog.backup_autocomplete(interaction, ''), [])
+        self.assertEqual(await self.cog.backup_autocomplete(self.interaction(None), ''), [])
         self.client.list_backups.assert_not_awaited()
 
 
