@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from discord import Interaction, app_commands
 from discord.ext import commands
@@ -14,12 +14,19 @@ from discord.ext import commands
 from core.crafty import (CraftyAPIError, CraftyClient, JsonDict, ServerAction, busy_state, parse_server_id,
                          player_count)
 from core.flags import FeatureDisabled, FeatureFlags
-from core.formatting import format_server_list, format_server_stats
+from core.formatting import format_server_list, format_server_stats, split_message
 
 logger = logging.getLogger(__name__)
 
 SERVER_LIST_CACHE_TTL = 60  # seconds
+BACKUP_LIST_CACHE_TTL = 30  # seconds
 MAX_AUTOCOMPLETE_CHOICES = 25  # Discord limit
+MAX_CHOICE_LENGTH = 100  # Discord limit for the name and the value of a choice
+
+
+def make_choice(name: str, value: str) -> app_commands.Choice[str]:
+    """Build an autocomplete choice that fits Discord's length limits."""
+    return app_commands.Choice(name=name[:MAX_CHOICE_LENGTH], value=value[:MAX_CHOICE_LENGTH])
 
 
 class ServerId(commands.Converter):
@@ -57,6 +64,7 @@ class ServerCommands(commands.Cog, name='Servers'):
         self._flags = flags
         self._server_cache: List[JsonDict] = []
         self._server_cache_time = 0.0
+        self._backup_cache: Dict[str, Tuple[float, List[JsonDict]]] = {}
 
     def cog_check(self, ctx: commands.Context) -> bool:
         # Applies to the prefix and the slash version of every command in this cog.
@@ -87,29 +95,41 @@ class ServerCommands(commands.Cog, name='Servers'):
 
         current = current.lower()
         choices = [
-            app_commands.Choice(name=server.get('server_name') or server['server_id'],
-                                value=server['server_id'])
+            make_choice(str(server.get('server_name') or server['server_id']), server['server_id'])
             for server in servers
-            if str(server.get('server_name', '')).lower().startswith(current)
+            if server.get('server_id') and str(server.get('server_name', '')).lower().startswith(current)
         ]
         return choices[:MAX_AUTOCOMPLETE_CHOICES]
 
+    async def _cached_backups(self, server_id: str) -> List[JsonDict]:
+        now = time.monotonic()
+        cached = self._backup_cache.get(server_id)
+        if cached is None or now - cached[0] >= BACKUP_LIST_CACHE_TTL:
+            cached = (now, await self._client.list_backups(server_id))
+            self._backup_cache[server_id] = cached
+        return cached[1]
+
     async def backup_autocomplete(self, interaction: Interaction,
                                   current: str) -> List[app_commands.Choice[str]]:
-        """Suggest the backup configurations of the server selected in the same command."""
+        """Suggest the backup configurations of the server selected in the same command (owner only)."""
+        # The command is owner-only, so the names of the backups are too.
+        if not await interaction.client.is_owner(interaction.user):
+            return []
         server_id = parse_server_id(str(getattr(interaction.namespace, 'server_id', '') or ''))
         if server_id is None:
             return []
         try:
-            backups = await self._client.list_backups(server_id)
+            backups = await self._cached_backups(server_id)
         except CraftyAPIError as exc:
             logger.warning('Autocomplete could not load the backups of server %s: %s', server_id, exc)
             return []
 
         current = current.lower()
-        names = [str(backup.get('backup_name') or backup['backup_id']) for backup in backups]
-        return [app_commands.Choice(name=name, value=name)
-                for name in names if name.lower().startswith(current)][:MAX_AUTOCOMPLETE_CHOICES]
+        # The value is the backup ID, which select_backup accepts as well, so long or duplicate names still work.
+        return [make_choice(str(backup.get('backup_name') or backup['backup_id']), str(backup['backup_id']))
+                for backup in backups
+                if str(backup.get('backup_name') or backup['backup_id']).lower().startswith(current)
+                ][:MAX_AUTOCOMPLETE_CHOICES]
 
     async def _ensure_stoppable(self, ctx: commands.Context, server_id: str, verb: str) -> bool:
         """Reply and return False if the server is not running or players are online."""
@@ -135,7 +155,10 @@ class ServerCommands(commands.Cog, name='Servers'):
         if not servers:
             await ctx.reply('No servers found. Make sure the Crafty user has a role with access to your servers.')
             return
-        await ctx.reply(f'Server information:\n{format_server_list(servers)}')
+        messages = split_message(['Server information:\n', *format_server_list(servers)])
+        await ctx.reply(messages[0])
+        for message in messages[1:]:
+            await ctx.send(message)
 
     @commands.hybrid_command(name='stats', description='get server stats')
     @app_commands.autocomplete(server_id=server_autocomplete)

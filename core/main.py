@@ -17,7 +17,7 @@ if not __package__:
 from core import __version__  # noqa: E402
 from core.bot import CraftyBot  # noqa: E402
 from core.config import ConfigError, Settings  # noqa: E402
-from core.crafty import CraftyClient  # noqa: E402
+from core.crafty import CraftyAPIError, CraftyClient  # noqa: E402
 from core.log import setup_logging  # noqa: E402
 
 logger = logging.getLogger('core.main')
@@ -49,6 +49,10 @@ def main() -> int:
         bot.run(settings.discord_token, log_handler=None)
     except discord.LoginFailure as exc:
         logger.error('Login to Discord failed, check DISCORD_TOKEN: %s', exc)
+        return 1
+    except CraftyAPIError as exc:
+        # Raised by setup_hook when logging in with CRAFTY_USERNAME and CRAFTY_PASSWORD fails.
+        logger.error('Login to Crafty failed, check SERVER_URL and the Crafty login settings: %s', exc)
         return 1
     except discord.PrivilegedIntentsRequired:
         logger.error('Enable the "Message Content Intent" of the bot in the Discord developer portal')

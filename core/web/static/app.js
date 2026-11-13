@@ -88,7 +88,10 @@ function showFlagError(message) {
   $('flags-error').textContent = message || '';
 }
 
+let flagRequests = 0;  // while a flag is being changed, a background reload must not reset the switches
+
 async function setFlag(name, enabled, input) {
+  flagRequests += 1;
   input.disabled = true;
   try {
     const response = await fetch(api(`api/flags/${encodeURIComponent(name)}`), {
@@ -105,6 +108,8 @@ async function setFlag(name, enabled, input) {
     input.checked = !enabled;
     input.disabled = false;
     showFlagError(`Could not change ${name}: ${error.message}`);
+  } finally {
+    flagRequests -= 1;
   }
 }
 
@@ -124,10 +129,12 @@ function renderFlags(data) {
 }
 
 async function loadFlags() {
+  if (flagRequests) return;
   try {
     const response = await fetch(api('api/flags'), { cache: 'no-store' });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+    if (flagRequests) return;
     showFlagError(null);
     renderFlags(body);
   } catch (error) {
@@ -162,21 +169,40 @@ function logEntryNode(entry) {
   return row;
 }
 
-function renderLogs() {
-  const box = $('logs');
-  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+function logMatchesFilter(entry) {
   const minLevel = LEVEL_ORDER[$('log-filter').value];
   const search = $('log-search').value.trim().toLowerCase();
-  const visible = logState.entries.filter((entry) => (LEVEL_ORDER[entry.level] || 0) >= minLevel
-    && (!search || entry.message.toLowerCase().includes(search) || entry.logger.toLowerCase().includes(search)));
+  return (LEVEL_ORDER[entry.level] || 0) >= minLevel
+    && (!search || entry.message.toLowerCase().includes(search) || entry.logger.toLowerCase().includes(search));
+}
 
+function showEmptyLogs(box) {
+  const empty = document.createElement('p');
+  empty.className = 'logs-empty';
+  empty.textContent = logState.entries.length ? 'No log entries match the filter.' : 'No log entries yet.';
+  box.replaceChildren(empty);
+}
+
+// Rebuilds the whole list, for a changed filter or search.
+function renderLogs() {
+  const box = $('logs');
+  const visible = logState.entries.filter(logMatchesFilter);
+  if (visible.length) box.replaceChildren(...visible.map(logEntryNode));
+  else showEmptyLogs(box);
+  box.scrollTop = box.scrollHeight;
+}
+
+// Adds new entries below the existing ones, which keeps the scroll position and any text selection.
+function appendLogs(entries) {
+  const box = $('logs');
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+  const visible = entries.filter(logMatchesFilter);
   if (visible.length) {
-    box.replaceChildren(...visible.map(logEntryNode));
-  } else {
-    const empty = document.createElement('p');
-    empty.className = 'logs-empty';
-    empty.textContent = logState.entries.length ? 'No log entries match the filter.' : 'No log entries yet.';
-    box.replaceChildren(empty);
+    if (box.querySelector('.logs-empty')) box.replaceChildren();
+    box.append(...visible.map(logEntryNode));
+    while (box.childElementCount > MAX_LOG_ENTRIES) box.firstElementChild.remove();
+  } else if (!box.childElementCount) {
+    showEmptyLogs(box);
   }
   if (atBottom) box.scrollTop = box.scrollHeight;
 }
@@ -201,10 +227,18 @@ async function loadLogs() {
     if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
     showLogsError(null);
     renderLogLevel(body);
-    if (body.entries.length || !logState.lastId) {
+    if (body.last_id < logState.lastId) {
+      // The bot restarted and numbers its log entries from 1 again: start over.
+      logState.entries = [];
+      logState.lastId = 0;
+      $('logs').replaceChildren();
+      loadLogs();
+      return;
+    }
+    if (body.entries.length || !$('logs').childElementCount) {
       logState.entries = logState.entries.concat(body.entries).slice(-MAX_LOG_ENTRIES);
       logState.lastId = body.entries.length ? body.entries[body.entries.length - 1].id : logState.lastId;
-      renderLogs();
+      appendLogs(body.entries);
     }
   } catch (error) {
     showLogsError(`Could not load the logs: ${error.message}`);
@@ -242,4 +276,4 @@ refresh();
 loadFlags();
 loadLogs();
 setInterval(loadLogs, LOG_REFRESH_MS);
-setInterval(refresh, REFRESH_MS);
+setInterval(() => { refresh(); loadFlags(); }, REFRESH_MS);

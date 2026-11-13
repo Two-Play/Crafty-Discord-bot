@@ -5,6 +5,8 @@ from unittest.mock import patch
 import discord
 
 from core import main
+from core.config import BASE_DIR
+from core.crafty import CraftyAPIError
 
 
 class TestMain(unittest.TestCase):
@@ -25,7 +27,7 @@ class TestMain(unittest.TestCase):
         with self.assertLogs('core', level='DEBUG') as logs:
             self.assertEqual(main.main(), 0)
         bot_class.return_value.run.assert_called_once_with('discord', log_handler=None)
-        setup_logging.assert_called_with('DEBUG', 'bot.log')
+        setup_logging.assert_called_with('DEBUG', str(BASE_DIR / 'bot.log'))
         self.assertNotIn('discord', ' '.join(record.getMessage() for record in logs.records
                                              if 'Settings' in record.getMessage()))
 
@@ -49,6 +51,18 @@ class TestMain(unittest.TestCase):
         with self.assertLogs('core', level='ERROR') as logs:
             self.assertEqual(main.main(), 1)
         self.assertIn('DISCORD_TOKEN', logs.output[-1])
+
+    @patch.object(main, 'setup_logging')
+    @patch.object(main, 'CraftyBot')
+    @patch.object(main, 'load_dotenv')
+    @patch.dict(os.environ, {'SERVER_URL': 'https://crafty.local', 'DISCORD_TOKEN': 'discord',
+                             'CRAFTY_USERNAME': 'bot', 'CRAFTY_PASSWORD': 'wrong-password'},  # nosec B105
+                clear=True)
+    def test_crafty_login_failure_exits_with_error(self, _load_dotenv, bot_class, _setup_logging):
+        bot_class.return_value.run.side_effect = CraftyAPIError('POST /api/v2/auth/login returned HTTP 401')
+        with self.assertLogs('core', level='ERROR') as logs:
+            self.assertEqual(main.main(), 1)
+        self.assertIn('Login to Crafty failed', logs.output[-1])
 
 
 if __name__ == '__main__':

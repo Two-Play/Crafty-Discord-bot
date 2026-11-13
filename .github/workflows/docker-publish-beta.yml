@@ -1,11 +1,24 @@
-name: Publish Docker Image
+name: Publish Docker beta image
 
+# Beta tags (1.2.3-beta) always build. Pushes to develop only build when something that ends up in
+# the image changed (path filters are not applied to tags).
 on:
   push:
     tags:
       - '*.*.*-beta'
     branches:
       - develop
+    paths:
+      - 'core/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/docker-publish-beta.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: docker-beta-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   build-and-push:
@@ -13,62 +26,40 @@ jobs:
     permissions:
       contents: read
       packages: write
-
+    env:
+      IMAGE_NAME: twoplay/craftybot
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Extract Git tag
-      id: get_version
-      run: |
-        TAG=${GITHUB_REF##*/}
-        echo "tag=$TAG" >> $GITHUB_ENV
-        echo "repository=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+      - name: Set image names
+        run: |
+          echo "GHCR_IMAGE=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
+          # Only beta tags get a version tag, develop pushes only update beta
+          if [ "${{ github.ref_type }}" = tag ]; then
+            echo "VERSION=${{ github.ref_name }}" >> "$GITHUB_ENV"
+          fi
 
-    # Docker Login
-    - name: Log in to DockerHub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ vars.DOCKERHUB_USERNAME }}
-        password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    # Docker Image Build
-    - name: Build and tag Docker image
-      run: |
-        IMAGE_NAME="twoplay/craftybot"
-        VERSION=$tag
-        LOWERCASE_REPO=$repository
-
-        echo "tag=$tag"
-        echo "Building Docker image $IMAGE_NAME:$VERSION"
-        # Build Image
-        docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$VERSION .
-        echo "Tagging Docker image latest"
-        docker tag $IMAGE_NAME:latest ghcr.io/$LOWERCASE_REPO:latest
-        echo "Tagging Docker image $VERSION"
-        docker tag $IMAGE_NAME:$VERSION ghcr.io/$LOWERCASE_REPO:$VERSION
-
-    # Push to DockerHub
-    - name: Push DockerHub image
-      run: |
-        IMAGE_NAME="twoplay/craftybot"
-        VERSION=$tag
-
-        docker push $IMAGE_NAME:beta
-        docker push $IMAGE_NAME:$VERSION
-
-    # Push to GitHub Packages
-    - name: Push GitHub image
-      run: |
-        VERSION=$tag
-        LOWERCASE_REPO=$repository
-
-        docker push ghcr.io/$LOWERCASE_REPO:latest
-        docker push ghcr.io/$LOWERCASE_REPO:$VERSION
+      - name: Build and push
+        run: |
+          TAGS="beta${VERSION:+ $VERSION}"
+          ARGS=""
+          for tag in $TAGS; do ARGS="$ARGS -t $IMAGE_NAME:$tag -t $GHCR_IMAGE:$tag"; done
+          docker build $ARGS .
+          for tag in $TAGS; do
+            docker push "$IMAGE_NAME:$tag"
+            docker push "$GHCR_IMAGE:$tag"
+          done

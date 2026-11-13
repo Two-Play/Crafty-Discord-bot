@@ -13,7 +13,9 @@ from core.config import Settings
 from core.crafty import CraftyAPIError
 from core.flags import FeatureFlags, FlagSaveError, flag_definitions
 from core.log import LOG_BUFFER, set_log_level
-from core.web.dashboard import DashboardStartError, WebDashboard, describe_bind_error, summarize_server
+from core.web.dashboard import DashboardStartError, WebDashboard, describe_bind_error
+from core.web.security import host_allowed
+from core.web.status import summarize_server
 
 SETTINGS = Settings(server_url='https://crafty.local', discord_token='discord', crafty_token='crafty',
                     web_enabled=True)
@@ -106,7 +108,7 @@ class TestDashboard(DashboardTestCase):
 
     async def test_crafty_unreachable(self):
         self.bot.crafty.list_servers.side_effect = CraftyAPIError('down')
-        with self.assertLogs('core.web.dashboard', level='WARNING'):
+        with self.assertLogs('core.web.status', level='WARNING'):
             data = await (await self.client.get('/api/status')).json()
         self.assertEqual(data['servers'], [])
         self.assertIn('not reachable', data['error'])
@@ -114,7 +116,7 @@ class TestDashboard(DashboardTestCase):
     async def test_stats_error_for_one_server(self):
         self.bot.crafty.get_stats.side_effect = lambda server_id: (
             RUNNING_STATS if server_id == 'a' else (_ for _ in ()).throw(CraftyAPIError('down')))
-        with self.assertLogs('core.web.dashboard', level='WARNING'):
+        with self.assertLogs('core.web.status', level='WARNING'):
             data = await (await self.client.get('/api/status')).json()
         self.assertIsNone(data['servers'][0]['error'])
         self.assertEqual(data['servers'][1]['error'], 'Stats not available')
@@ -182,6 +184,30 @@ class TestDashboard(DashboardTestCase):
                                          headers={'X-Crafty-Bot': '1'})
         self.assertEqual(response.status, 403)
         self.assertTrue(self.bot.flags.is_enabled('command_stop'))
+
+    async def test_unknown_path_has_security_headers(self):
+        response = await self.client.get('/does-not-exist')
+        self.assertEqual(response.status, 404)
+        self.assertIn('Content-Security-Policy', response.headers)
+
+    async def test_foreign_host_is_rejected_without_password(self):
+        with self.assertLogs('core.web.security', level='WARNING'):
+            response = await self.client.get('/api/status', headers={'Host': 'evil.example.com'})
+        self.assertEqual(response.status, 403)
+
+    async def test_logs_return_last_id(self):
+        logging.getLogger('core.test').info('entry')
+        newest = LOG_BUFFER.last_id
+        data = await (await self.client.get('/api/logs?after=999999999')).json()
+        self.assertEqual(data['entries'], [])
+        self.assertGreaterEqual(data['last_id'], newest)  # the test server's access log may add entries
+        self.assertLess(data['last_id'], 999999999)
+
+    async def test_static_files_are_cached(self):
+        await self.client.get('/app.js')
+        with patch('core.web.dashboard.STATIC_DIR', Path('/nonexistent-crafty-bot-static')):
+            response = await self.client.get('/app.js')
+        self.assertEqual(response.status, 200)
 
     async def test_health(self):
         response = await self.client.get('/healthz')
@@ -295,6 +321,10 @@ class TestDashboardPassword(DashboardTestCase):
         self.assertEqual(response.status, 500)
         self.assertNotIn('disk full', (await response.json())['error'])
 
+    async def test_foreign_host_allowed_with_password(self):
+        response = await self.client.get('/api/status', headers={**self.auth('secret'), 'Host': 'bot.example.com'})
+        self.assertEqual(response.status, 200)
+
     async def test_health_without_password(self):
         response = await self.client.get('/healthz')
         self.assertEqual(response.status, 200)
@@ -336,6 +366,19 @@ class TestDashboardStartErrors(unittest.IsolatedAsyncioTestCase):
         for error, expected in cases:
             with self.subTest(error=error):
                 self.assertIn(expected, describe_bind_error(error, 'nohost', 80))
+
+
+class TestHostAllowed(unittest.TestCase):
+
+    def test_hosts(self):
+        cases = [
+            ('localhost:8080', True), ('127.0.0.1:8080', True), ('192.168.1.5', True), ('[::1]:8080', True),
+            ('::1', True), ('LOCALHOST', True), ('evil.example.com', False), ('evil.example.com:8080', False),
+            ('bot.example.com', True),
+        ]
+        for host, expected in cases:
+            with self.subTest(host=host):
+                self.assertEqual(host_allowed(host, ('bot.example.com',)), expected)
 
 
 if __name__ == '__main__':
