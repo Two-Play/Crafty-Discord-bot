@@ -52,7 +52,7 @@ def main() -> int:
         return 1
     except CraftyAPIError as exc:
         # Raised by setup_hook when logging in with CRAFTY_USERNAME and CRAFTY_PASSWORD fails.
-        logger.error('Login to Crafty failed, check SERVER_URL, CRAFTY_USERNAME and CRAFTY_PASSWORD: %s', exc)
+        logger.error('Login to Crafty failed, check SERVER_URL and the Crafty login settings: %s', exc)
         return 1
     except discord.PrivilegedIntentsRequired:
         logger.error('Enable the "Message Content Intent" of the bot in the Discord developer portal')

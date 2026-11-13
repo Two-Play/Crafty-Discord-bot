@@ -56,7 +56,8 @@ class TestMain(unittest.TestCase):
     @patch.object(main, 'CraftyBot')
     @patch.object(main, 'load_dotenv')
     @patch.dict(os.environ, {'SERVER_URL': 'https://crafty.local', 'DISCORD_TOKEN': 'discord',
-                             'CRAFTY_USERNAME': 'bot', 'CRAFTY_PASSWORD': 'wrong-password'}, clear=True)
+                             'CRAFTY_USERNAME': 'bot', 'CRAFTY_PASSWORD': 'wrong-password'},  # nosec B105
+                clear=True)
     def test_crafty_login_failure_exits_with_error(self, _load_dotenv, bot_class, _setup_logging):
         bot_class.return_value.run.side_effect = CraftyAPIError('POST /api/v2/auth/login returned HTTP 401')
         with self.assertLogs('core', level='ERROR') as logs:
