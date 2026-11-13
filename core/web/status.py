@@ -1,6 +1,4 @@
-"""
-Collects the status of the bot and of every Crafty server for the dashboard.
-"""
+"""Collects the status of the bot and of every Crafty server for the dashboard."""
 
 from __future__ import annotations
 
@@ -49,6 +47,7 @@ class StatusCollector:
     """Builds the status snapshot and caches it for a few seconds."""
 
     def __init__(self, bot: CraftyBot):
+        """Create the collector for the given bot."""
         self.bot = bot
         self._started = time.monotonic()
         self._snapshot: Optional[Dict[str, Any]] = None

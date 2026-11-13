@@ -13,6 +13,7 @@ MAX_LISTED_PLAYERS = 20
 def split_message(parts: Iterable[str], limit: int = DISCORD_MESSAGE_LIMIT) -> List[str]:
     """
     Join the parts into as few messages as possible that each fit Discord's length limit.
+
     A part is never split, so code blocks stay intact; parts longer than the limit are cut.
     """
     messages: List[str] = []
